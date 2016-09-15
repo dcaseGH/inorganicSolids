@@ -369,6 +369,7 @@ class dlpolyOutput():
             All args are the outputs in the header--- they are floats
         '''
 
+        errorDetected = False
         if not self.outputString:
             self.outputString = kwargs['outputString']
 
@@ -415,18 +416,24 @@ class dlpolyOutput():
                 if 'run terminating' in dataLines[il + 3]:
                     break
 
-                # follow same thing as above when making header
-                dataInstant = np.array([dataLines[il + il2].split() for il2 in xrange(1, 4)], dtype=str)
-                dataAverage = [dataLines[il + il2].split() for il2 in xrange(5, 8)]
-                dataAverage[2].insert(0, 'None')
-                dataAverage = np.array(dataAverage, dtype=str)
+                try:
+                    # follow same thing as above when making header
+                    dataInstant = np.array([dataLines[il + il2].split() for il2 in xrange(1, 4)], dtype=str)
+                    dataAverage = [dataLines[il + il2].split() for il2 in xrange(5, 8)]
+                    dataAverage[2].insert(0, 'None')
+                    dataAverage = np.array(dataAverage, dtype=str)
 
-                # assume that timeVariables ordered as defined
-                for ik, k in enumerate(timeVariables):
-                    resultsDict[k].append( timeFormat[ik]( dataInstant[ik, 0] ) )
-                for i in args:
-                    resultsDict[i].append( float( dataInstant[ headerIndices[i] ] ) )
-                    resultsDict[i + 'Average'].append( float( dataAverage[ headerIndices[i] ] ) )
+                    # assume that timeVariables ordered as defined
+                    for ik, k in enumerate(timeVariables):
+                        resultsDict[k].append( timeFormat[ik]( dataInstant[ik, 0] ) )
+                    for i in args:
+                        resultsDict[i].append( float( dataInstant[ headerIndices[i] ] ) )
+                        resultsDict[i + 'Average'].append( float( dataAverage[ headerIndices[i] ] ) )
+                except:
+                    errorDetected = True
+
+        if errorDetected:
+            print "Latent error detected, perhaps not all data good/available"
 
         self.outputDF = pd.DataFrame(resultsDict)
         return self.outputDF
