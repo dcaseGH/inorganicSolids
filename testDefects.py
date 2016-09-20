@@ -2,7 +2,24 @@ import unittest
 #from coreClasses import *# Structure
 import numpy as np
 
-class TestDefects(unittest.TestCase):
+class TestDefectsCoreClasses(unittest.TestCase):
+    ''' General manipulations of structure etc for making defects '''
+
+    def testSobolRemoveSpecies(self):
+        ''' This is done from within DLPOLY input '''
+        from coreClasses import Species, Structure
+        from dlpolyIO import dlpolyInput
+
+        structure = dlpolyInput.initFromCONFIG('testFiles/exampleCONFIG').parentStructure
+        self.assertEqual(len([x for x in structure.speciesList if x.element == 'Li']), 
+                         300)
+
+        structure.removeSpeciesSobol(Species(element = 'Li'), 6)
+        #change charges 
+        #assert lithiums = 294
+        #assert charge neutral
+
+class TestDefectsGULP(unittest.TestCase):
     ''' Contains all defect Gulp/IO stuff  '''
 
     def testDefectsInputString(self):

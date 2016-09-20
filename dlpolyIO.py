@@ -32,6 +32,7 @@ class dlpolyInput():
                  engcfg             = None,
                  units              = 'eV',
                  temperature        = None,
+                 integrator         = None,
 #                 keywords           = [],
                  potentials         = [],
                  moleculeOrder      = None,
@@ -51,6 +52,7 @@ class dlpolyInput():
         self.moleculeOrder     = moleculeOrder
         self.units             = units
         self.temperature       = temperature
+        self.integrator        = integrator
         #these are just pointers (i think) to make it quicker to get information
         if self.parentStructure:
             self.unitCell      = self.parentStructure.unitCell
@@ -94,6 +96,7 @@ class dlpolyInput():
         self.parentStructure = Structure(unitCell    = self.aseStructure._cell,
                                          speciesList = [Species.initFromASEAtom(x) for x in self.aseStructure])
         # these should just be pointers.. should still get functionality of structure????
+        # CHANGE UNIT CELL TO BE UNIT CELL VECTORS
         self.unitCell    = self.parentStructure.unitCell
         self.speciesList = self.parentStructure.speciesList
         return
@@ -101,7 +104,7 @@ class dlpolyInput():
     @classmethod
     def initFromCONFIG(cls, configFile, levcfg = None):
         ''' Make an input from REVCON, for e.g. because you want to change things '''
-        from coreClasses import Structure, Species
+        from coreClasses import Structure, Species, UnitCell
         structure = Structure()
 
         def atomsInConfig(linesWithAtoms, levcfgIn, levcfg, natms):
@@ -134,9 +137,12 @@ class dlpolyInput():
             if levcfg is None:
                 levcfg = levcfgIn
 
-            structure.unitCell = np.array([lines[2].split(),
-                                           lines[3].split(),
-                                           lines[4].split()])
+#            structure.unitCell = np.array([lines[2].split(),
+#                                           lines[3].split(),
+#                                           lines[4].split()])
+            structure.unitCell = UnitCell(vectors = np.array([map(float, lines[2].split()),
+                                                              map(float, lines[3].split()),
+                                                              map(float, lines[4].split())]))
 
             structure.speciesList = atomsInConfig(lines[5:], levcfgIn, levcfg, natms)
 
@@ -196,35 +202,20 @@ class dlpolyInput():
         self.speciesList = newSpeciesList
 
         def rearrangeBondedList(previousSpeciesList, centralElement, adjacentElement, bondCutoff):
-#        ''' This rearranges list so that central element and all the atoms bonded to it are at the top
-#            e.g. this is used to take PO4 units and rearrange them 
-#            Assume that the above business of moving order wrt core/shel is complete '''
+            ''' This rearranges list so that central element and all the atoms bonded to it are at the top
+                e.g. this is used to take PO4 units and rearrange them 
+                Assume that the above business of moving order wrt core/shel is complete '''
             bondedList, nonBondedList = [], []
-#            print self.unitCell;exit()
-#            possibleDisplacements = np.array(self.uni
             for iat1, at1 in enumerate(previousSpeciesList):
                 if at1.element == centralElement:
                     bondedList.append(at1)#previousSpeciesList[iat1])
                     for iat2, at2 in enumerate(previousSpeciesList):
-#                        print iat2
                         if at2.element == adjacentElement and \
                            np.linalg.norm(at1.cartCoord - at2.cartCoord) < bondCutoff:
                             bondedList.append(at2)#previousSpeciesList[iat2])
-#                    print at1.element, at1.cartCoord
-#                    for x in previousSpeciesList:
-#                        print (x.element, x.core), min([np.linalg.norm(x.cartCoord - at1.cartCoord)])
-#                    print [(x.element, x.core) for x in bondedList];exit()
                 elif at1.element != adjacentElement:
                     nonBondedList.append(at1)#previousSpeciesList[iat1])
 
-#            print len(previousSpeciesList), len(bondedList), len(nonBondedList)
-#            print [(x.element, x.core) for x in previousSpeciesList]
-#            print [(x.element, x.core) for x in bondedList]
-#            print [x.element for x in nonBondedList]
-#            print "missing stuff"
-#            print [(x.element, x.cartCoord, x.core) for x in missingShit]
-#            for x in missingShit:
-#                print min([np.linalg.norm(x.cartCoord - y.cartCoord) for y in previousSpeciesList if y.element == 'P'])
             if len(previousSpeciesList) != len(bondedList) + len(nonBondedList):
                 raise ValueError("Error rearrangeBondedList %s ne %s %s")%(len(previousSpeciesList), len(bondedList), len(nonBondedList))
 
@@ -248,13 +239,6 @@ class dlpolyInput():
                             outList.append(previousSpeciesList[iat1])
                             break
             return outList
-
-#        print "HACKING A PO4 GROUP"
-#        bondedUnits = [['P', 'O', 1.7]]
-#        for bU in bondedUnits:
-#            self.speciesList = movedBondedAtomsWRTPeriodicBoundaries(self.speciesList, self.unitCell, *bU)
-#            self.speciesList = rearrangeBondedList(self.speciesList, *bU)
-
         return True
 
     def stringFormCONFIG(self):
@@ -345,6 +329,70 @@ class dlpolyInput():
 
         inString += "close\n"
         return inString       
+
+    def stringFormCONTROL(self):
+        '''   '''
+        outString  = self.title + "\n\n"
+        outString += "integration " + self.integrator + "\n\n"
+        outString += "temperature " + str(self.temperature) + "\n"
+        outString += "pressure " + str(self.pressure) + "\n"
+        outString += "ensemble " + self.ensemble + "\n"
+        outString += "\n"
+        outString += "\n"
+        outString += "\n"
+        outString += "\n"
+        outString += "\n"
+        outString += "\n"
+
+        return outString + 'finish'
+
+class dlpolyJob():
+    ''' Has information to run one DL_POLY classic job
+        Mainly needs CONTROL, FIELD and CONFIG somehow- either reads the string or learns file name
+        time in seconds (int or float??)
+        Either give a file (address of) or string 
+        Can technically set dlpolyInput to be a blank thing and just copy files around, but must set a time'''
+    def __init__(self,
+                 dlpolyInput   = None,
+                 configString  = None,
+                 controlString = None,
+                 fieldString   = None,
+                 configFile    = None,
+                 controlFile   = None,
+                 fieldFile     = None,
+                 time          = None,
+                ):
+
+        if dlpolyInput and time:
+            self.time        = float(time)
+            self.dlpolyInput = dlpolyInput
+        else:
+            return False
+
+        if configString:
+            self.configString  = configString
+        elif configFile:
+            self.configFile    = configFile
+        else:
+            self.configString  = self.dlpolyInput.stringFormCONFIG()
+
+        if fieldString:
+            self.fieldString   = fieldString
+        elif fieldFile:
+            self.fieldFile     = fieldFile
+        else:
+            self.fieldString   = self.dlpolyInput.stringFormFIELD()
+
+        if controlString:
+            self.controlString = controltring
+        elif controlFile:
+            self.controlFile   = controlFile
+        else:
+            self.controlString = self.dlpolyInput.stringFormCONTROL()
+
+        return True
+
+
 
 class dlpolyOutput():
     def __init__(self,

@@ -80,7 +80,9 @@ class UnitCell:
                  vectors = None):
         self.angles  = angles
         self.lengths = lengths
-        self.vectors = self.calculateVectors(self.lengths, self.angles)
+        self.vectors = vectors
+        if type(self.vectors) == 'NoneType' and type(self.angles) != 'NoneType' and type(self.lengths) != 'NoneType':
+            self.vectors = self.calculateVectors(self.lengths, self.angles)
 
     def calculateVectors(self, lengths, angles):
         """
@@ -312,6 +314,22 @@ class Structure:
         self.unitCell      = getUnitCellCIF     (cifName)
         self.speciesList   = getSpeciesListCIF  (cifName)
         self.symmetryGroup = getSymmetryGroupCIF(cifName)
+
+    def removeSpeciesSobol(self, species, nRemove, offset = 0):
+        ''' Remove nRemove species, that match character of species, according to closest fractional 
+            coordinates to those from sobol list 
+            Will only work well if atoms are sensibly bounded within lattice vectors (as looks in [0,1)^3 . LatticeVectors) '''
+
+
+        from sobol_lib import i4_sobol
+   
+        #Assume cartesian coordinates are wanted at this stage- easy to change if needed
+        cartesian = True
+        for n in xrange(offset, offset + nRemove):
+            sobVec, newSeed = i4_sobol(3, n)
+            if cartesian:
+                removeCentre = np.dot(sobVec, self.unitCell.vectors)
+                print removeCentre
 
     def customDisplacementsGULP(self, gulpOutput, originalCIF):
         ''' This is a subroutine to extract information from a gulpOutput
