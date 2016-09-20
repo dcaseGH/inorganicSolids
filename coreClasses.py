@@ -318,18 +318,37 @@ class Structure:
     def removeSpeciesSobol(self, species, nRemove, offset = 0):
         ''' Remove nRemove species, that match character of species, according to closest fractional 
             coordinates to those from sobol list 
-            Will only work well if atoms are sensibly bounded within lattice vectors (as looks in [0,1)^3 . LatticeVectors) '''
+            Will only work well if atoms are sensibly bounded within lattice vectors (as looks in [0,1)^3 . LatticeVectors)
+            Deletions are in order '''
 
-
+        from setTools import sameElementByAttributes
         from sobol_lib import i4_sobol
    
         #Assume cartesian coordinates are wanted at this stage- easy to change if needed
         cartesian = True
+        attributesList = [k for k in species.__dict__.keys() if species.__dict__[k] is not None]
+
+#        matchingElements = [x for x in self.speciesList if sameElementByAttributes(x, species, attributesList)]
+        deletedElements  = []
+
         for n in xrange(offset, offset + nRemove):
             sobVec, newSeed = i4_sobol(3, n)
             if cartesian:
                 removeCentre = np.dot(sobVec, self.unitCell.vectors)
-                print removeCentre
+                distance, savedPosition = np.inf, None
+#                for im, m in enumerate(matchingElements):
+                for im, m in enumerate(self.speciesList):
+                    if not sameElementByAttributes(m, species, attributesList):
+                        continue
+                    newDistance = np.linalg.norm(m.cartCoord - removeCentre)
+                    if newDistance < distance and im not in deletedElements:
+                        distance, savedPosition = newDistance, im
+            deletedElements.append(savedPosition)
+
+        for i in deletedElements:
+            del(self.speciesList[i])
+
+        return len(self.speciesList)
 
     def customDisplacementsGULP(self, gulpOutput, originalCIF):
         ''' This is a subroutine to extract information from a gulpOutput

@@ -137,9 +137,6 @@ class dlpolyInput():
             if levcfg is None:
                 levcfg = levcfgIn
 
-#            structure.unitCell = np.array([lines[2].split(),
-#                                           lines[3].split(),
-#                                           lines[4].split()])
             structure.unitCell = UnitCell(vectors = np.array([map(float, lines[2].split()),
                                                               map(float, lines[3].split()),
                                                               map(float, lines[4].split())]))

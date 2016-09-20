@@ -11,13 +11,26 @@ class TestDefectsCoreClasses(unittest.TestCase):
         from dlpolyIO import dlpolyInput
 
         structure = dlpolyInput.initFromCONFIG('testFiles/exampleCONFIG').parentStructure
+        structure.setCharges([Species(element = 'O', core = 'core', charge = -2.),
+                              Species(element = 'O', core = 'shel', charge = 0. ),
+                              Species(element = 'Li', charge = 1.),
+                              Species(element = 'Ti', charge = 4.),
+                              Species(element = 'P', charge = 5.)])
         self.assertEqual(len([x for x in structure.speciesList if x.element == 'Li']), 
                          300)
+        self.assertAlmostEqual(sum([x.charge for x in structure.speciesList]),
+                               0.)
 
-        structure.removeSpeciesSobol(Species(element = 'Li'), 6)
-        #change charges 
-        #assert lithiums = 294
-        #assert charge neutral
+        # check that there are now 6 removed species, and thay they are Lithiums
+        self.assertEqual(structure.removeSpeciesSobol(Species(element = 'Li'), 6),
+                         8994)
+        self.assertEqual(len([x for x in structure.speciesList if x.element == 'Li']), 
+                         294)
+
+        newCharge = 4. + 6. / float(len([x for x in structure.speciesList if x.element == 'Ti']))
+        structure.setCharges([Species(element = 'Ti', charge = newCharge)])
+        self.assertAlmostEqual(sum([x.charge for x in structure.speciesList]),
+                               0.)
 
 class TestDefectsGULP(unittest.TestCase):
     ''' Contains all defect Gulp/IO stuff  '''
