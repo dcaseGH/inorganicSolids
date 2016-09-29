@@ -98,7 +98,37 @@ def getUnitCellCIF(inputFile):
 
     return UnitCell(lengths = np.array(lengths), angles = np.array(angles))
 
-def writeCIF(structure):
-    pass
+def quickCifString(structure):
+    ''' P1 cell, no labels '''
 
+    outString  = "_cell_length_a " + str(structure.unitCell.lengths[0]) + "\n"
+    outString += "_cell_length_b " + str(structure.unitCell.lengths[1]) + "\n"
+    outString += "_cell_length_c " + str(structure.unitCell.lengths[2]) + "\n"
+    outString += "_cell_angle_alpha " + str(structure.unitCell.angles[0]) + "\n"
+    outString += "_cell_angle_beta "  + str(structure.unitCell.angles[1]) + "\n"
+    outString += "_cell_angle_gamma " + str(structure.unitCell.angles[2]) + "\n"
+    outString += "loop_\n"
+    outString += "_symmetry_equiv_pos_site_id\n"
+    outString += "_symmetry_equiv_pos_as_xyz\n"
+    outString += "1 'x, y, z'\n"
+    outString += "loop_\n"
+    outString += "_atom_site_label\n"
+    outString += "_atom_site_fract_x\n"
+    outString += "_atom_site_fract_y\n"
+    outString += "_atom_site_fract_z\n"
+
+    for x in structure.speciesList:
+        if x.core != 'core':
+            continue
+        outString += "%s %s %s %s \n"%(x.element, x.fracCoord[0], x.fracCoord[1], x.fracCoord[2])
+
+    return outString
+
+
+def writeCIF(fileName, structure, quickCif = True):
+    ''' At the moment just makes a quick P1 cell '''
+    if quickCif:
+        cifString = quickCifString(structure)
+    with open(fileName, 'w') as outf:
+        outf.write(cifString)
 

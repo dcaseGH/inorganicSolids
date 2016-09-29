@@ -9,7 +9,8 @@ class OutputFileGULP():
     #def makeOutputStructure()
     @classmethod
     def latticeEnergy(self, inputString):
-        return
+        ''' Only return energy in eV at this point '''
+        return float(inputString.split('Total lattice energy')[1].replace('=', '').split('eV')[0])
 
     @classmethod
     def readOutputCompOpti(self, inputString):

@@ -252,8 +252,11 @@ class dlpolyInput():
         inString += " ".join(map(self.numberFormatter, [self.levcfg, self.imcon, self.natms, self.engcfg, "\n"])).replace("None", "")
 
         # print unit cell
+        formatter = ff.FortranRecordWriter('(3f20.10)')
         for i in xrange(3):
-            inString += " ".join(map(self.numberFormatter, self.unitCell[i].tolist())) + "\n"
+#            inString += " ".join(map(self.numberFormatter, self.unitCell[i].tolist())) + "\n"
+#            inString += " ".join(map(self.numberFormatter, self.unitCell.vectors[i].tolist())) + "\n"
+            inString += formatter.write(self.unitCell.vectors[i].tolist()) + "\n"
 
         for iat, atom in enumerate(self.speciesList):
             if self.levcfg > 0 and atom.cartVelocity is None:

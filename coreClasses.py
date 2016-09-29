@@ -78,11 +78,20 @@ class UnitCell:
                  angles  = None,
                  lengths = None,
                  vectors = None):
-        self.angles  = angles
-        self.lengths = lengths
-        self.vectors = vectors
-        if type(self.vectors) == 'NoneType' and type(self.angles) != 'NoneType' and type(self.lengths) != 'NoneType':
+
+        self.angles     = angles
+        self.lengths    = lengths
+        self.vectors    = vectors
+        self.invVectors = None
+
+        if self.vectors is None and self.angles is not None and self.lengths is not None:
             self.vectors = self.calculateVectors(self.lengths, self.angles)
+
+        if self.vectors is not None and self.angles is None and self.lengths is None:
+            self.lengths = np.array(map(np.linalg.norm, [self.vectors[i] for i in xrange(3)]))
+            self.angles  = (180. / np.pi) * np.array(map(np.arccos,[np.dot(self.vectors[1], self.vectors[2]) / (self.lengths[1] * self.lengths[2]),
+                                                                    np.dot(self.vectors[0], self.vectors[2]) / (self.lengths[0] * self.lengths[2]),
+                                                                    np.dot(self.vectors[0], self.vectors[1]) / (self.lengths[0] * self.lengths[1])]))
 
     def calculateVectors(self, lengths, angles):
         """
@@ -107,6 +116,9 @@ class UnitCell:
         self.vectors = np.array([vector_a, vector_b, vector_c])
         return self.vectors
 
+    def setInvVectors(self):
+        self.invVectors = np.linalg.inv(self.vectors)
+
 class VSpring:
     ''' Assume that spring between species1 core and shel  '''
     def __init__(self,
@@ -124,7 +136,7 @@ class VSpring:
         return "spring\n%s %s"%(l1, self.K)
 
 class VBuckingham:
-    ''' Follow 1.4.3 GULP manual (rho is inverse length)
+    ''' Follow 1.4.3 GULP manual (rho is length (angstrom))
         fitA etc are flags (ignore for now) '''
     def __init__(self,
                  species1   = None,
@@ -255,6 +267,30 @@ class Structure:
             if not subsetByAttributes([x], tempList, attrList):
                 tempList.append(x)
         return tempList
+
+    def setFracCoord(self):
+        ''' CHECK CORRECT WAY AROUND!!!!!!!!!!!!!!
+            assumes have lattice (vectors) set '''
+        if not self.unitCell.invVectors:
+            self.unitCell.setInvVectors()
+        for i in xrange(len(self.speciesList)):
+            self.speciesList[i].fracCoord = np.dot(self.speciesList[i].cartCoord, self.unitCell.invVectors)
+
+    def setCartCoord(self):
+        ''' CHECK CORRECT WAY AROUND!!!!!!!!!!!!!!
+            assumes have lattice (vectors) set '''
+        for i in xrange(len(self.speciesList)):
+            self.speciesList[i].cartCoord = np.dot(self.speciesList[i].fracCoord, self.unitCell.vectors)
+
+    def resetFracCoord(self):
+        ''' set all Frac Coord to be [0,1)^3 '''
+        for i in xrange(len(self.speciesList)):
+            self.speciesList[i].fracCoord -= np.floor(self.speciesList[i].fracCoord)
+
+        # if there are cart coords, reset these too
+        if self.speciesList[0].cartCoord is not None:
+            self.setCartCoord()            
+        print "Please set good tests for all these- consider different programs and their conventions"
 
     def addShells(self, newSpecies, displacement = np.zeros(3), cartesian = False):
         ''' can add displacement to a shell to avoid energy catastrophe
@@ -389,53 +425,3 @@ class Structure:
                           [sorted(originalStructure.get_neighbors(s, 4.), key = lambda x:x[1])[0][1] for s in sitesOriginalStructure])
 
         return originalDisps, newDisps
-
-#string out the thing below, it's an example only
-'''
-x = Structure( unitCell    = UnitCell(angles  = [90.,90,90],
-                                      lengths = [3.5, 4.2, 1.2]),
-               speciesList = [Species(label = 'Cl', fracCoord = [0.1,0.3,.4], charge = -2.),
-                              Species(label = 'Na', fracCoord = [0.3,0.3,.1], charge = 1. )],
-             )
-'''
-
-
-#p = PotentialList([
-
-#Species(label = 'Cl', core = 'core'
-#) # get this so that can define species clearly and return a potential
-
-'''
-a = InputFile(fileName   = 'test',
-              title      = 'example input',
-              keywords   = ['conv opti'],
-              parentStructure = Structure( unitCell    = UnitCell(angles  = [90.,90,90],
-                                                                  lengths = [3.5, 4.2, 1.2]),
-                                           speciesList = [Species(label = 'Cl', fracCoord = [0.1,0.3,.4], charge = -2.),
-                                                          Species(label = 'Na', fracCoord = [0.3,0.3,.1], charge = 1. )],
-                                        ),
-              potentials = [VBuckingham(species1 = Species(label = 'Cl'),
-                                        species2 = Species(label = 'Na'),
-                                        A        = 1200.,
-                                        rho      = 0.3,
-                                        C6       = 20.)])
-print a.stringForm()
-print a.potentialInputString()
-a.writeFile('test.gin')
-'''
-#exit()
-#a = InputFile(fileName = 'test',
-#                   structure = Structure(unitCell = UnitCell(angles  = [90.,90,90],
-#                                                     lengths = [3.5, 4.2, 1.2]),
-#                                         speciesList = [Species(label = 'Cl', fracCoord = [0.1,0.3,.4]),
-#                                                        Species(label = 'Na', fracCoord = [0.3,0.3,.1])]),
-#                   keywords = [],
-#                   potentials = [VBuckingham(species1 = Species(label = 'Cl'),
-#                                             species2 = Species(label = 'Na'),
-#                                             A        = 1200.,
-#                                             rho      = 0.3,
-#                                             C6       = 20.)]
-#             )
-#print a.stringForm()
-
-#class Potential():
