@@ -52,10 +52,20 @@ savedPotentials = {
                                K        = 65.)
                   ],
 
+'lowestAlTiOSearch':[
+                     VBuckingham(species1 = Species(element = 'Al'),
+                                 species2 = Species(element = 'O',  core='shel'),
+                                 A        = 1761.207581 ,
+                                 rho      = 0.292213 ,
+                                 C6       = 0.0)]
 }
 
+currentPotentialSet = savedPotentials['lowestLTPSearch'] + savedPotentials['lowestAlTiOSearch']
+
+
 ''' lowestLTPSearch is the lowest one in in the Sobol search that passed the negative eigenvalue checks
-    secondLTPSearch is 2nd lowest-- did this to check results for Li diffusion, and thermostats etc    '''
+    secondLTPSearch is 2nd lowest-- did this to check results for Li diffusion, and thermostats etc   
+    lowestAlTiOSearch -> see Work/AlTiO/AlTiODataAnalysis.ipynb '''
 
 
 
