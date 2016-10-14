@@ -117,6 +117,9 @@ def quickCifString(structure):
     outString += "_atom_site_fract_y\n"
     outString += "_atom_site_fract_z\n"
 
+    if structure.speciesList[0].fracCoord is None:
+        structure.setFracCoord()
+
     for x in structure.speciesList:
         if x.core != 'core':
             continue

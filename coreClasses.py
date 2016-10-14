@@ -58,6 +58,10 @@ class Species:
         self.cartVelocity = np.array([norm.ppf(random.random(), scale=sigma) for _ in xrange(3)])
         return self.cartVelocity
 
+    def atomicValenceElectrons(self):
+         from hardcode import atomicValenceElectrons
+         return atomicValenceElectrons[self.element]
+
 class Defect():#Species):
     # Do super classes later- python 2 vs 3 issues (and I did it wrong the first time)
     def __init__(self,
@@ -165,7 +169,7 @@ class VBuckingham:
 
     def energy(self, r):
         ''' Units are same as A or C6, r is rho^{-1} '''
-        return self.A * np.exp(-r / self.rho) - C6 * r **-6 
+        return self.A * np.exp(-r / self.rho) - self.C6 * r **-6 
 
     def stringForm(self):
         ''' specify potential labels if you want different types of same atom 
@@ -425,3 +429,6 @@ class Structure:
                           [sorted(originalStructure.get_neighbors(s, 4.), key = lambda x:x[1])[0][1] for s in sitesOriginalStructure])
 
         return originalDisps, newDisps
+
+    def numberValenceElectrons(self):
+        return sum([x.atomicValenceElectrons() for x in self.speciesList if x.core == 'core'])

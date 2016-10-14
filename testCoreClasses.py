@@ -94,6 +94,16 @@ class TestStructureMethods(unittest.TestCase):
                                                        [ 0.53048842,  1.310947,    1.41421356],
                                                        [ 0.,          0.,          3.        ]]))
 
+    def test_numberValenceElectrons(self):
+        from dlpolyIO import dlpolyInput
+        s = dlpolyInput.initFromCONFIG('testFiles/exampleCONFIG').parentStructure
+        print len([x for x in s.speciesList if x.element == 'Al'])
+        print len([x for x in s.speciesList if x.element == 'Li'])
+        print len([x for x in s.speciesList if x.element == 'O'])
+        print len([x for x in s.speciesList if x.element == 'P'])
+        print len([x for x in s.speciesList if x.element == 'Ti'])
+
+
 class TestSpeciesMethods(unittest.TestCase):
     def test_setThermalVelocity(self):
         from coreClasses import Species
@@ -106,6 +116,10 @@ class TestSpeciesMethods(unittest.TestCase):
         line = ff.FortranRecordWriter('(3f20.0)')
         print oCore.cartVelocity, line.write(oCore.cartVelocity.tolist())
 
+    def test_atomicValenceElectrons(self):
+        from coreClasses import Species
+        s = Species(element = 'Li')
+        self.assertTrue(s.atomicValenceElectrons() == 1)
 
 if __name__ == '__main__':
     unittest.main()

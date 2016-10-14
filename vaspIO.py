@@ -125,3 +125,24 @@ class VaspXML():
                          speciesList = [Species(element = elements[i], fracCoord = positions[i]) for i in xrange(nAtoms)])
 #         return cls.createStructure(xmlString      = xmlString,
 #                                    structureIndex = -1)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Write input and output files mainly')
+    parser.add_argument('-icx', '--initialCifXml', action = "store_true", default=False, help='write initial output cif from .xml')
+    parser.add_argument('-fcx', '--finalCifXml', action = "store_true", default=False, help='write final output cif from .xml')
+    parser.add_argument('-xml', '--xmlFile',     default='vasprun.xml', help='name of .xml')
+
+    args = parser.parse_args()
+
+    if args.initialCifXml:
+        from cifIO import writeCIF
+        writeCIF('initialStructure.cif',
+                 VaspXML().initialStructure(open(args.xmlFile, 'r').read()))
+
+    if args.finalCifXml:
+        from cifIO import writeCIF
+        writeCIF('finalStructure.cif',
+                 VaspXML().finalStructure(open(args.xmlFile, 'r').read()))

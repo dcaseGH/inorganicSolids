@@ -84,7 +84,7 @@ class dlpolyInput():
         ''' Atm initialize an instance of dlployInput, then run this to fill in details
             supercell is tuple of ints, i.e. (1,1,1)
             ASE has lots of stuff- e.g. velocity distn etc, maybe use later '''
-        from coreClasses import Species, Structure
+        from coreClasses import Species, Structure, UnitCell
         # consider issues wiht supercell... primative cells etc... keep simple
         from ase.io import read as ASERead
         #self.parentStructure should be a core Structure instance, and ASE structure should be some
@@ -93,8 +93,11 @@ class dlpolyInput():
         if superCell:
 #            self.parentStructure = self.parentStructure * superCell
             self.aseStructure = self.aseStructure * superCell
-        self.parentStructure = Structure(unitCell    = self.aseStructure._cell,
+#        self.parentStructure = Structure(unitCell    = self.aseStructure._cell,
+#                                         speciesList = [Species.initFromASEAtom(x) for x in self.aseStructure])
+        self.parentStructure = Structure(unitCell    = UnitCell(vectors = self.aseStructure._cell),
                                          speciesList = [Species.initFromASEAtom(x) for x in self.aseStructure])
+
         # these should just be pointers.. should still get functionality of structure????
         # CHANGE UNIT CELL TO BE UNIT CELL VECTORS
         self.unitCell    = self.parentStructure.unitCell
