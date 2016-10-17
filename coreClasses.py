@@ -313,13 +313,16 @@ class Structure:
         self.speciesList += tempList
         return len(self.speciesList)
 
-    def setCharges(self, templateSpecies):
-        ''' Pass in some templateSpecies- anything in speciesList that matches these gets the template's charge  '''
+    def setCharges(self, templateSpecies, onlySetSome = False):
+        ''' Pass in some templateSpecies- anything in speciesList that matches these gets the template's charge 
+            use onlySetSome if this crashes because some are left unset '''
         from setTools import sameElementByAttributes
         for t in templateSpecies:
             for xs, s in enumerate(self.speciesList):
                 if sameElementByAttributes(t, s, ['element', 'core']):
                     self.speciesList[xs].charge = t.charge
+        if onlySetSome:
+            return None
         return sum(x.charge for x in self.speciesList)
 
     def setASEMasses(self, templateSpecies):
@@ -330,7 +333,7 @@ class Structure:
             for xs, s in enumerate(self.speciesList):
                 if sameElementByAttributes(t, s, ['element', 'core']):
                     self.speciesList[xs].mass = atomic_masses[chemical_symbols.index(t.element)]
-        return sum(x.charge for x in self.speciesList)
+        return #sum(x.charge for x in self.speciesList)
 
     def changeMassesForShells(self, templateSpecies, massShell = 0.):
         ''' Take some mass from core and add to shell where matches templateSpecies 
@@ -347,6 +350,31 @@ class Structure:
                     elif s.core[:4] == 'shel':
                         self.speciesList[xs].mass = massShell
         return sum(x.charge for x in self.speciesList)
+
+    @classmethod
+    def fromASEStructure(cls, aseStructure):
+        ''' Reading in an ASE structure can help make supercells
+            the ASE cif reader doesn't read much information- just the basics '''
+        return cls(unitCell    = UnitCell(vectors = aseStructure._cell),
+                   speciesList = [Species.initFromASEAtom(x) for x in aseStructure])
+
+    @classmethod
+    def fromGULPOutput(cls, gulpOutputString):
+        ''' Makes P1 cell from gulp output
+            assumes that you've run an opti calculation (the comp writes info at the bottom and can be used, but see other subroutines, not this)
+            please check this if running in a novel manner '''
+        # test that can be turned into PMG structure or something and same as the custom gulp thing below
+        from gulpIO import OutputFileGULP
+        gulpOutputDict = OutputFileGULP().readOutputOpti(gulpOutputString)
+
+        return cls(unitCell    = gulpOutputDict['unitCell'],
+                   speciesList = gulpOutputDict['speciesList'])
+    
+
+#    @classmethod
+#    def fromPMGStructure(cls, pgmStructure):
+#        return cls(unitCell = pgmStructure...,
+#                   speciesList = )
 
 #    @classmethod
     def inputCIF(self, cifName):
@@ -432,3 +460,14 @@ class Structure:
 
     def numberValenceElectrons(self):
         return sum([x.atomicValenceElectrons() for x in self.speciesList if x.core == 'core'])
+
+    def composition(self, considerShellsSeparately = False):
+        ''' Return dict with elements and number of times they appear (ignore the shells stuff unless needed '''
+        from setTools import subsetByAttributes
+        return dict(zip([x.element for x in self.uniqueSpecies(['element'])],
+                        [len([x for x in self.speciesList if x.element == y.element and x.core[:4].lower() == 'core']) for y in self.uniqueSpecies(['element'])]))
+
+    def compositionString(self, considerShellsSeparately = False):
+        ''' Return a string with the composition '''
+        composition = self.composition(considerShellsSeparately = considerShellsSeparately)
+        return "; ".join(map(str, [" ".join(map( str, [composition[k], k])) for k in composition.keys()]))

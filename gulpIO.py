@@ -13,8 +13,56 @@ class OutputFileGULP():
         return float(inputString.split('Total lattice energy')[1].replace('=', '').split('eV')[0])
 
     @classmethod
+    def findAllLatticeEnergies(self, inputString):
+        ''' Generator for energies in eV '''
+        for subString in inputString.split('Total lattice energy')[1:-1]:
+            # only return the energies which are in eV- 50 characters is big enough to include all of the line
+            if 'eV' in "".join(subString[:50]):
+                yield float(subString.replace('=', '').split('eV')[0])
+        return
+
+    @classmethod
+    def listAllLatticeEnergies(self, inputString):
+        ''' Return a list of lattice energies in eV '''
+        return [x for x in self.findAllLatticeEnergies(inputString)]
+
+    @classmethod
+    def finalSpeciesListFromOpti(self, inputString):
+        ''' After a GULP optimisation, generate the Species '''
+        from coreClasses import Species
+        shellKeys = {'c': 'core', 's': 'shel'}
+ 
+        for a in inputString.split('Final fractional coordinates of atoms :')[1].split("------------\n")[2].split("\n"):
+
+            if "------------" in a:
+                return
+
+            yield(Species(element   = a.split()[1],
+                          core      = shellKeys[a.split()[2]],
+                          fracCoord = np.array(a.split()[3:6], dtype='float64')))
+
+        return
+
+    @classmethod
+    def finalUnitCellFromOpti(self, inputString):
+        ''' Return a unitCell object '''
+
+        from coreClasses import UnitCell
+        uc = inputString.split('Final Cartesian lattice vectors (Angstroms)')[1].split("\n")[2:5]
+        return UnitCell(vectors = np.array([x.split() for x in uc], dtype='float64'))
+
+    @classmethod
+    def readOutputOpti(self, inputString):
+        ''' Assume run opti calculation and get all things to make new structure 
+            Doesn't use Comp table as readOutputCompOpti does '''
+
+        return{'speciesList': [x for x in self.finalSpeciesListFromOpti(inputString)],
+               'unitCell':    self.finalUnitCellFromOpti(inputString)}
+
+    @classmethod
     def readOutputCompOpti(self, inputString):
-        ''' If you run comp and opti it will make a table of changes - read this '''
+        ''' If you run comp and opti it will make a table of changes - read this
+            particular table and make a dictionary of results '''
         stringTable = inputString.split('Parameter   Initial value   Final value   Difference    Units      Percent')[1].split('Volume')[1]
         newCoords  = []
         newLengths = []
