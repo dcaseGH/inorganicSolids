@@ -375,8 +375,19 @@ class Structure:
 #    def fromPMGStructure(cls, pgmStructure):
 #        return cls(unitCell = pgmStructure...,
 #                   speciesList = )
+    @classmethod
+    def fromCIF(cls, cifName):
+        from cifIO import getUnitCellCIF, getSpeciesListCIF, getSymmetryGroupCIF
+        try:
+            symmetryGroup = getSymmetryGroupCIF(cifName)
+        except:
+            print "Couldn't determine symmetry group"
+            symmetryGroup = None
+        return cls(unitCell      = getUnitCellCIF     (cifName),
+                   speciesList   = getSpeciesListCIF  (cifName),
+                   symmetryGroup = symmetryGroup)
 
-#    @classmethod
+
     def inputCIF(self, cifName):
         from cifIO import getUnitCellCIF, getSpeciesListCIF, getSymmetryGroupCIF
         self.unitCell      = getUnitCellCIF     (cifName)
@@ -458,16 +469,58 @@ class Structure:
 
         return originalDisps, newDisps
 
+    def nearestNeighbourDistance(self, 
+                                 speciesListIndex = None, 
+                                 targetSpecies    = None,
+                                 cutoffRadius     = None):
+        ''' Give a species list index, and get displacement of nearest neighbour from this (\AA)
+            targetSpecies is optional, and only the element is used at this stage  '''
+
+        # cutoffRadius is for looking for neighbours- 4. is only really appropriate for close things
+        if not cutoffRadius:
+            cutoffRadius = 4.
+
+        #start by temporarily making a PMG structure- use this functionality and watch fracCoord bounds
+        centralFracCoord = self.speciesList[speciesListIndex].fracCoord - np.floor(self.speciesList[speciesListIndex].fracCoord)
+        tempPMGStructure = self.makePMGStructure() 
+        centralSite = [s for s in tempPMGStructure._sites if np.allclose(s._fcoords, centralFracCoord, atol=1.e-6)][0]
+
+        tempPMGNeighbours = sorted(tempPMGStructure.get_neighbors(centralSite, cutoffRadius), key = lambda x:x[1])
+        if targetSpecies:
+            return[x[1] for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element][0]
+        else:
+            return tempPMGNeighbours[0][1]
+
     def numberValenceElectrons(self):
         return sum([x.atomicValenceElectrons() for x in self.speciesList if x.core == 'core'])
 
     def composition(self, considerShellsSeparately = False):
         ''' Return dict with elements and number of times they appear (ignore the shells stuff unless needed '''
+
         from setTools import subsetByAttributes
+
         return dict(zip([x.element for x in self.uniqueSpecies(['element'])],
                         [len([x for x in self.speciesList if x.element == y.element and x.core[:4].lower() == 'core']) for y in self.uniqueSpecies(['element'])]))
 
     def compositionString(self, considerShellsSeparately = False):
         ''' Return a string with the composition '''
+
         composition = self.composition(considerShellsSeparately = considerShellsSeparately)
+
         return "; ".join(map(str, [" ".join(map( str, [composition[k], k])) for k in composition.keys()]))
+
+    def makePMGStructure(self):
+        from pymatgen.core import Structure as PMGS
+        from pymatgen.core import Lattice   as PMGL
+
+        outLattice   = PMGL.from_parameters(*list(self.unitCell.lengths) + list(self.unitCell.angles))
+
+        if self.symmetryGroup is None or not self.symmetryGroup.number:
+            print "symmetryGroup.number is unknown -> P1 cell"
+            self.symmetryGroup = SymmetryGroup(number = 1)
+
+        outStructure = PMGS.from_spacegroup(self.symmetryGroup.number,
+                                            outLattice,
+                                            [x.element   for x in self.speciesList if x.core[:4] == 'core'],
+                                            [x.fracCoord for x in self.speciesList if x.core[:4] == 'core'])
+        return outStructure

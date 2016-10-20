@@ -6,7 +6,8 @@ def tidyStringNumber(stringIn):
 def getSpeciesListCIF(inputFile):
     ''' CIF files tend to be loop_ then _attributes then data, but for now assume 
         the third loop contains the atoms etc 
-        Should consider that many things can be read, but for now just get label and fractional coordinates '''
+        Should consider that many things can be read, but for now just get label and fractional coordinates
+        REPLACE THIS ONE DAY WITH SOMETHING FROM PMG OR ASE '''
     from coreClasses import Species
     import re
     speciesList   = []
@@ -31,30 +32,21 @@ def getSpeciesListCIF(inputFile):
                     infoList.append(l.replace("\n", "").split("_atom_site_")[1].lower())
                 if not "_atom_site_" in l:
                     splitL = l.split()
+
+                    # if there is a number in the label (should be) then cut off before to get element                    
+                    if bool(re.search(r'\d', splitL[infoList.index('label')])):
+                        element = splitL[infoList.index('label')][:re.search("\d", splitL[infoList.index('label')]).start()],
+                    else:
+                        element = splitL[infoList.index('label')]
+
                     speciesList.append(Species(label     = splitL[infoList.index('label')],
-                                               element   = splitL[infoList.index('label')][:re.search("\d", splitL[infoList.index('label')]).start()],
+                                               element   = element,
                                                fracCoord = np.array(map(tidyStringNumber,
                                                                     [splitL[infoList.index('fract_x')],
                                                                      splitL[infoList.index('fract_y')],
                                                                      splitL[infoList.index('fract_z')]])))
                                        )
-#    with open(inputFile, 'r') as iFile:
-#        for l in iFile.read().split("loop_\n")[-1].split("\n"):
-#            if "#end" in l.lower():
-#                break
-#            #edited by DHC 110816 to disregard the _atom_site_aniso_ information
-##            if "_atom_site_" in l and not "_atom_site_aniso_" in l:
-#            if "_atom_site_" in l:
-#                infoList.append(l.replace("\n", "").split("_atom_site_")[1].lower())
-#            if not "_atom_site_" in l:
-#                splitL = l.split()
-#                speciesList.append(Species(label     = splitL[infoList.index('label')],
-#                                           element   = splitL[infoList.index('label')][:re.search("\d", splitL[infoList.index('label')]).start()],
-#                                           fracCoord = np.array(map(tidyStringNumber,
-#                                                                    [splitL[infoList.index('fract_x')],
-#                                                                     splitL[infoList.index('fract_y')],
-#                                                                     splitL[infoList.index('fract_z')]])))
-#                                  )
+
     return speciesList
 
 def getSymmetryGroupCIF(inputFile):

@@ -88,7 +88,6 @@ class TestStructureMethods(unittest.TestCase):
     def test_UnitCell(self):
         ''' This had better work, as stolen from pymatget and test is crap'''
         u = UnitCell(lengths = np.array([1., 2., 3.]), angles = np.array([45., 46., 47.]))
-        print 
         np.testing.assert_array_almost_equal(u.calculateVectors(np.array([1., 2., 3.]), np.array([45., 46., 47.])),
                                              np.array([[ 0.7193398,   0.,          0.69465837],
                                                        [ 0.53048842,  1.310947,    1.41421356],
@@ -102,7 +101,16 @@ class TestStructureMethods(unittest.TestCase):
         print len([x for x in s.speciesList if x.element == 'O'])
         print len([x for x in s.speciesList if x.element == 'P'])
         print len([x for x in s.speciesList if x.element == 'Ti'])
-
+        print 'finish test_numberValenceElectrons'
+ 
+    def test_nearestNeighbourDistance(self):
+        from coreClasses import Structure, Species
+        structure = Structure().fromCIF('testFiles/exampleNeighbours.cif')
+        np.testing.assert_almost_equal(structure.nearestNeighbourDistance(speciesListIndex = -1),
+                                       1.9509368212716025)
+        np.testing.assert_almost_equal(structure.nearestNeighbourDistance(speciesListIndex = -1,
+                                                                          targetSpecies = Species(element = 'Al')),
+                                       2.3585408060499997)
 
 class TestSpeciesMethods(unittest.TestCase):
     def test_setThermalVelocity(self):

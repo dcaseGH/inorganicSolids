@@ -60,7 +60,7 @@ savedPotentials = {
                                  C6       = 0.0)]
 }
 
-currentPotentialSet = savedPotentials['lowestLTPSearch'] + savedPotentials['lowestAlTiOSearch']
+currentPotentialSet141016 = savedPotentials['lowestLTPSearch'] + savedPotentials['lowestAlTiOSearch']
 
 
 ''' lowestLTPSearch is the lowest one in in the Sobol search that passed the negative eigenvalue checks
