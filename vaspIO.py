@@ -3,7 +3,7 @@ import fortranformat as ff
 
 fortranWriter= ff.FortranRecordWriter('(3f15.10)')
 
-class vaspInput():
+class VaspInput():
     def __init__(self,
                  parentStructure    = None,
 #                 aseStructure       = None,
@@ -134,8 +134,16 @@ if __name__ == "__main__":
     parser.add_argument('-icx', '--initialCifXml', action = "store_true", default=False, help='write initial output cif from .xml')
     parser.add_argument('-fcx', '--finalCifXml', action = "store_true", default=False, help='write final output cif from .xml')
     parser.add_argument('-xml', '--xmlFile',     default='vasprun.xml', help='name of .xml')
+    parser.add_argument('-pc', '--poscarCif',    default=None, help='make POSCAR from this cif')
 
     args = parser.parse_args()
+
+    if args.poscarCif:
+        from coreClasses import Structure
+        POSCARName = 'CIF_POSCAR'
+        with open(POSCARName, 'w') as outf:
+            vaspIn = VaspInput(parentStructure = Structure.fromCIF(args.poscarCif))
+            outf.write(vaspIn.generatePOSCARString())
 
     if args.initialCifXml:
         from cifIO import writeCIF

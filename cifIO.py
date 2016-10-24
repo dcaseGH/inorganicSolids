@@ -3,7 +3,43 @@ import numpy as np
 def tidyStringNumber(stringIn):
     return float(stringIn.split('(')[0])
 
+
+def tidyLabelWithDigits(stringIn):
+    ''' If there is a digit in the string, chop off up to this point
+        This is because Label = Number + element (ish) '''
+
+    import re
+
+    if bool(re.search(r'\d', stringIn)):
+        return stringIn[:re.search("\d", stringIn).start()]
+    else:
+        return stringIn
+
 def getSpeciesListCIF(inputFile):
+    ''' inputFile is the name of an input file 
+        use ASE at this point to quickly parse file 
+        DOES NOTHING ABOUT FRACTIONAL OCCUPANCY '''
+
+#    from pymatgen.io.cif import CifFile
+    from ase.io.cif import parse_cif
+    from coreClasses import Species
+
+    aseParser = parse_cif(inputFile)
+    labels    = aseParser[0][1]['_atom_site_label']
+    elements  = map(tidyLabelWithDigits, aseParser[0][1]['_atom_site_label'])
+    fracX     = aseParser[0][1]['_atom_site_fract_x']
+    fracY     = aseParser[0][1]['_atom_site_fract_y']
+    fracZ     = aseParser[0][1]['_atom_site_fract_z']
+
+    return [Species(element   = elements[i],
+                    label     = labels[i],
+                    fracCoord = np.array([fracX[i],
+                                          fracY[i],
+                                          fracZ[i]], dtype = 'float64'))
+            for i in xrange(len(labels))]
+
+
+def getSpeciesListCIF_DEPRECATED(inputFile):
     ''' CIF files tend to be loop_ then _attributes then data, but for now assume 
         the third loop contains the atoms etc 
         Should consider that many things can be read, but for now just get label and fractional coordinates
@@ -93,7 +129,8 @@ def getUnitCellCIF(inputFile):
 def quickCifString(structure):
     ''' P1 cell, no labels '''
 
-    outString  = "_cell_length_a " + str(structure.unitCell.lengths[0]) + "\n"
+    outString  = "data_\n" 
+    outString += "_cell_length_a " + str(structure.unitCell.lengths[0]) + "\n"
     outString += "_cell_length_b " + str(structure.unitCell.lengths[1]) + "\n"
     outString += "_cell_length_c " + str(structure.unitCell.lengths[2]) + "\n"
     outString += "_cell_angle_alpha " + str(structure.unitCell.angles[0]) + "\n"
@@ -117,7 +154,7 @@ def quickCifString(structure):
             continue
         outString += "%s %s %s %s \n"%(x.element, x.fracCoord[0], x.fracCoord[1], x.fracCoord[2])
 
-    return outString
+    return outString + "#end\n"
 
 
 def writeCIF(fileName, structure, quickCif = True):

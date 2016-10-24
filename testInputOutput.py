@@ -6,6 +6,12 @@ import numpy as np
 ''' Tests only work on dhcs computer atm- make portable if others ever want them  '''
 
 class TestCIFFileReading(unittest.TestCase):
+    def test_tidyStringNumber(self):
+        from cifIO import tidyLabelWithDigits
+        self.assertTrue(tidyLabelWithDigits('Ti3') == 'Ti')
+        self.assertTrue(tidyLabelWithDigits('Ti') == 'Ti')
+        self.assertTrue(tidyLabelWithDigits('1111111Ti3') == '')
+
     def test_readCIF(self):
         self.assertTrue(True)
 

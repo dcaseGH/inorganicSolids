@@ -16,6 +16,7 @@ class Species:
                  cartForce      = None,
                  core           = 'core'
                  ):
+
         self.label          = label
         self.potentialLabel = potentialLabel
         self.element        = element
@@ -469,27 +470,46 @@ class Structure:
 
         return originalDisps, newDisps
 
-    def nearestNeighbourDistance(self, 
-                                 speciesListIndex = None, 
-                                 targetSpecies    = None,
-                                 cutoffRadius     = None):
-        ''' Give a species list index, and get displacement of nearest neighbour from this (\AA)
+    def speciesMatchIndices(self,
+                            targetSpecies   = None,
+                            matchAttributes = ['element']):
+        ''' Return list of indices of matches to targetSpecies '''
+
+        from setTools import sameElementByAttributes
+
+        return [x[0] for x in enumerate(self.speciesList) if sameElementByAttributes(x[1], targetSpecies, matchAttributes)]
+
+    def nearestNeighbourDistance(self,
+                                   speciesListIndex = None, 
+                                   targetSpecies    = None,
+                                   cutoffRadius     = None):
+        ''' Nearest neighbour (of particular type) is first instance in RDF '''
+
+        return self.radialDistributionFunction(speciesListIndex = speciesListIndex,
+                                               targetSpecies    = targetSpecies,
+                                               cutoffRadius     = cutoffRadius)[0]
+
+    def radialDistributionFunction(self, 
+                                   speciesListIndex = None, 
+                                   targetSpecies    = None,
+                                   cutoffRadius     = None):
+        ''' Give a species list index, and get displacement list of nearest neighbours from this (\AA)
             targetSpecies is optional, and only the element is used at this stage  '''
 
         # cutoffRadius is for looking for neighbours- 4. is only really appropriate for close things
         if not cutoffRadius:
             cutoffRadius = 4.
 
-        #start by temporarily making a PMG structure- use this functionality and watch fracCoord bounds
+        # start by temporarily making a PMG structure- use this functionality and watch fracCoord bounds
         centralFracCoord = self.speciesList[speciesListIndex].fracCoord - np.floor(self.speciesList[speciesListIndex].fracCoord)
         tempPMGStructure = self.makePMGStructure() 
         centralSite = [s for s in tempPMGStructure._sites if np.allclose(s._fcoords, centralFracCoord, atol=1.e-6)][0]
 
         tempPMGNeighbours = sorted(tempPMGStructure.get_neighbors(centralSite, cutoffRadius), key = lambda x:x[1])
         if targetSpecies:
-            return[x[1] for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element][0]
+            return [x[1] for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element]
         else:
-            return tempPMGNeighbours[0][1]
+            return [x[1] for x in tempPMGNeighbours]
 
     def numberValenceElectrons(self):
         return sum([x.atomicValenceElectrons() for x in self.speciesList if x.core == 'core'])
