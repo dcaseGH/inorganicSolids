@@ -28,11 +28,21 @@ class OutputFileGULP():
 
     @classmethod
     def finalSpeciesListFromOpti(self, inputString):
-        ''' After a GULP optimisation, generate the Species '''
+        ''' After a GULP optimisation, generate the Species
+            If this fails, possibly not in P1 cell '''
         from coreClasses import Species
         shellKeys = {'c': 'core', 's': 'shel'}
  
-        for a in inputString.split('Final fractional coordinates of atoms :')[1].split("------------\n")[2].split("\n"):
+        if 'Final fractional coordinates of atoms :' in inputString:
+            keyPartOfString = 'Final fractional coordinates of atoms :'
+        elif 'Final asymmetric unit coordinates :' in inputString:
+            print "Only making asymmetric part of cell- calc sym another way!"
+            keyPartOfString = 'Final asymmetric unit coordinates :'
+        else:
+            raise Exception('Cant make species list from GULP output')
+
+#        for a in inputString.split('Final fractional coordinates of atoms :')[1].split("------------\n")[2].split("\n"):
+        for a in inputString.split(keyPartOfString)[1].split("------------\n")[2].split("\n"):
 
             if "------------" in a:
                 return

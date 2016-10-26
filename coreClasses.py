@@ -33,6 +33,20 @@ class Species:
         return cls(cartCoord = aseAtom.position, 
                     element  =  aseAtom.symbol)
 
+    @classmethod
+    def initFromPMGSite(cls, pmgSite):
+        ''' Strictly PMG has _sites and so on ... 
+            _species sits on _site '''
+
+        return cls(cartCoord = pmgSite._coords,
+                   fracCoord = pmgSite._fcoords,
+                   element   = pmgSite._species._data.keys()[0].symbol) 
+
+    @staticmethod
+    def elementFromPMGSpecies(pmgSpecies):
+        ''' Should return element string from an instance of a PMG _species '''
+        return pmgSpecies._data.keys()[0].symbol
+
     def dlpolyLabelStandard(self):
         # for the moment try to use just this standard labelling scheme
         outString = self.element
@@ -297,6 +311,31 @@ class Structure:
             self.setCartCoord()            
         print "Please set good tests for all these- consider different programs and their conventions"
 
+    def applyFracDisplacement(self, fracDisplacement):
+        ''' Move all species '''
+        # calc Frac Coord if don't already have it
+        if self.speciesList[0].fracCoord is None:
+            self.setFracCoord()
+
+        print self.speciesList[0].fracCoord
+        # move fracCoord
+        for i in xrange(len(self.speciesList)):
+            self.speciesList[i].fracCoord += fracDisplacement
+        print self.speciesList[0].fracCoord
+
+        # if using cartCoord, recalc it
+        if self.speciesList[0].cartCoord is not None:
+            self.setCartCoord()
+
+
+    def displaceAllSpecies(self, cartDisplacement = None, fracDisplacement = None):
+        ''' Do cartDisplacement if needed 
+            frac takes precedence if give both (DONT DO THIS!!) '''
+        if fracDisplacement is not None:
+            self.applyFracDisplacement(fracDisplacement)
+            return True
+
+
     def addShells(self, newSpecies, displacement = np.zeros(3), cartesian = False):
         ''' can add displacement to a shell to avoid energy catastrophe
             note, either works on cartesian or fractional- possible bugs if both needed '''
@@ -352,6 +391,16 @@ class Structure:
                         self.speciesList[xs].mass = massShell
         return sum(x.charge for x in self.speciesList)
 
+#    def expandAllSymmetry(self):
+#        ''' Convert this into a P1 cell 
+#            Use PMG?? '''
+#
+#        if self.symmetryGroup is not None:
+#            self.symmetryGroup = SymmetryGroup(number = 1)
+# 
+#        raise Exception('Better to just read a cif with PMG or ASE for now')
+
+
     @classmethod
     def fromASEStructure(cls, aseStructure):
         ''' Reading in an ASE structure can help make supercells
@@ -372,12 +421,21 @@ class Structure:
                    speciesList = gulpOutputDict['speciesList'])
     
 
-#    @classmethod
-#    def fromPMGStructure(cls, pgmStructure):
-#        return cls(unitCell = pgmStructure...,
-#                   speciesList = )
     @classmethod
-    def fromCIF(cls, cifName):
+    def fromPMGStructure(cls, pmgStructure):
+        return cls(unitCell    = UnitCell(vectors = pmgStructure._lattice._matrix),
+                   speciesList = [Species().initFromPMGSite(x) for x in pmgStructure._sites])
+
+    @classmethod
+    def fromCIF(cls, cifName, expandFullCell = False):
+        ''' cifName is just the name of the file (inc. location if different directory)
+            expandFullCell will return a P1 cell and use PMG to expand all symmetry operators 
+            N.B. two methods dont give same order, and no cartCoords from default method '''
+
+        if expandFullCell:
+            from pymatgen.core import Structure as PMGS
+            return cls.fromPMGStructure(PMGS.from_file(cifName))
+
         from cifIO import getUnitCellCIF, getSpeciesListCIF, getSymmetryGroupCIF
         try:
             symmetryGroup = getSymmetryGroupCIF(cifName)
@@ -480,21 +538,26 @@ class Structure:
         return [x[0] for x in enumerate(self.speciesList) if sameElementByAttributes(x[1], targetSpecies, matchAttributes)]
 
     def nearestNeighbourDistance(self,
-                                   speciesListIndex = None, 
-                                   targetSpecies    = None,
-                                   cutoffRadius     = None):
-        ''' Nearest neighbour (of particular type) is first instance in RDF '''
+                                 speciesListIndex = None, 
+                                 targetSpecies    = None,
+                                 cutoffRadius     = None):
+        ''' Nearest neighbour (of particular type) is first instance in RDF 
+            centred at speciesListIndex '''
 
         return self.radialDistributionFunction(speciesListIndex = speciesListIndex,
                                                targetSpecies    = targetSpecies,
                                                cutoffRadius     = cutoffRadius)[0]
 
     def radialDistributionFunction(self, 
-                                   speciesListIndex = None, 
-                                   targetSpecies    = None,
-                                   cutoffRadius     = None):
+                                   speciesListIndex     = None, 
+                                   targetSpecies        = None,
+                                   cutoffRadius         = None,
+                                   returnVectors        = False,
+                                   returnSpeciesList    = False):
         ''' Give a species list index, and get displacement list of nearest neighbours from this (\AA)
-            targetSpecies is optional, and only the element is used at this stage  '''
+            targetSpecies is optional, and only the element is used at this stage 
+            if returnVectors these are cartesian vectors 
+            if returnSpeciesList this is a list of Species, with positions WRT central atom '''
 
         # cutoffRadius is for looking for neighbours- 4. is only really appropriate for close things
         if not cutoffRadius:
@@ -506,10 +569,22 @@ class Structure:
         centralSite = [s for s in tempPMGStructure._sites if np.allclose(s._fcoords, centralFracCoord, atol=1.e-6)][0]
 
         tempPMGNeighbours = sorted(tempPMGStructure.get_neighbors(centralSite, cutoffRadius), key = lambda x:x[1])
+#        print [x[0]._species for x in tempPMGNeighbours[:5]];print centralSite.__dict__;exit()
         if targetSpecies:
-            return [x[1] for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element]
+            listNeighbours = [x for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element]
         else:
-            return [x[1] for x in tempPMGNeighbours]
+            listNeighbours = tempPMGNeighbours
+
+#            return [x[1] for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element]
+        if returnVectors:
+            return [x[0]._coords - centralSite._coords for x in listNeighbours]
+        elif returnSpeciesList:
+            return [Species(element = Species.elementFromPMGSpecies(x[0]._species),
+                            cartCoord = x[0]._coords - centralSite._coords) for x in listNeighbours]
+#            print "NOt implaMEETNNTNTED yet";exit()
+        else:
+#            return [x[1] for x in tempPMGNeighbours]
+            return [x[1] for x in listNeighbours]
 
     def numberValenceElectrons(self):
         return sum([x.atomicValenceElectrons() for x in self.speciesList if x.core == 'core'])

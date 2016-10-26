@@ -112,7 +112,50 @@ class TestStructureMethods(unittest.TestCase):
                                                                           targetSpecies = Species(element = 'Al')),
                                        2.3585408060499997)
 
+    def test_fromCIF(self):
+        ''' Note two methods reorder things and dont always return cartesian coords  '''
+
+        from coreClasses import Structure
+
+        structure1 = Structure().fromCIF('testFiles/exampleNeighbours.cif')
+        np.testing.assert_almost_equal(structure1.unitCell.lengths[2],
+                                       20.974129)
+        tempSpecies  = structure1.speciesList[0]
+        self.assertTrue(tempSpecies.element == 'P')
+        np.testing.assert_array_almost_equal(tempSpecies.fracCoord,
+                                             np.array([0.2905, 0.0, 0.25]), decimal = 4)
+        self.assertTrue(tempSpecies.cartCoord is None)
+
+        structure2 = Structure().fromCIF('testFiles/exampleNeighbours.cif', expandFullCell = True)
+        np.testing.assert_almost_equal(structure2.unitCell.lengths[2],
+                                       20.974129)
+        tempSpecies  = structure2.speciesList[0]
+        self.assertTrue(tempSpecies.element == 'Li')
+        np.testing.assert_array_almost_equal(tempSpecies.fracCoord,
+                                             np.array([0.9891, 0.0002, 0.5028]), decimal = 4)
+        np.testing.assert_array_almost_equal(tempSpecies.cartCoord,
+                                             np.array([8.1429, 0.0015, 10.5466]), decimal = 4)
+
+
+    def test_fromPMGStructure(self):
+        from pymatgen.core import Structure as PMGS
+        from coreClasses   import Structure
+        pmgStructure = PMGS.from_file('testFiles/exampleNeighbours.cif')
+        myStructure  = Structure().fromPMGStructure(pmgStructure)
+
+        np.testing.assert_almost_equal(myStructure.unitCell.lengths[2],
+                                       20.974129)
+
+        tempSpecies  = myStructure.speciesList[0]
+        self.assertTrue(tempSpecies.element == 'Li')
+        np.testing.assert_array_almost_equal(tempSpecies.fracCoord,
+                                             np.array([0.9891, 0.0002, 0.5028]), decimal = 4)
+        np.testing.assert_array_almost_equal(tempSpecies.cartCoord,
+                                             np.array([8.1429, 0.0015, 10.5466]), decimal = 4)
+
+
 class TestSpeciesMethods(unittest.TestCase):
+
     def test_setThermalVelocity(self):
         from coreClasses import Species
         oCore  = Species(element = 'O', core = 'core')
@@ -128,6 +171,18 @@ class TestSpeciesMethods(unittest.TestCase):
         from coreClasses import Species
         s = Species(element = 'Li')
         self.assertTrue(s.atomicValenceElectrons() == 1)
+
+    def test_initFromPMGAtom(self):
+        from pymatgen.core import Structure as PMGS
+        pmgStructure = PMGS.from_file('testFiles/exampleNeighbours.cif')
+
+        from coreClasses import Species
+        tempSpecies = Species().initFromPMGSite(pmgStructure._sites[0])
+        self.assertTrue(tempSpecies.element == 'Li')
+        np.testing.assert_array_almost_equal(tempSpecies.fracCoord,
+                                             np.array([0.9891, 0.0002, 0.5028]), decimal = 4)
+        np.testing.assert_array_almost_equal(tempSpecies.cartCoord,
+                                             np.array([8.1429, 0.0015, 10.5466]), decimal = 4)
 
 if __name__ == '__main__':
     unittest.main()

@@ -164,3 +164,20 @@ def writeCIF(fileName, structure, quickCif = True):
     with open(fileName, 'w') as outf:
         outf.write(cifString)
 
+def writeCIFFromSpeciesList(fileName, 
+                            speciesList, 
+                            lengths      = np.array([50., 50.,50.]),
+                            displacement = np.array([0.5, 0.5, 0.5])):
+    ''' Puts the species in the list into a box and prints it 
+        put into the middle with displacement = 0.5, 0.5, 0.5 '''
+    from coreClasses import Structure, UnitCell
+
+    tempStructure = Structure(unitCell = UnitCell(lengths = lengths,
+                                                  angles  = np.array([90., 90., 90.])),
+                              speciesList = speciesList)
+
+    # moving to centre of cell is good idea for clarity
+    tempStructure.displaceAllSpecies(fracDisplacement = displacement)
+
+    with open(fileName, 'w') as outf:
+        outf.write(quickCifString(tempStructure))
