@@ -212,6 +212,34 @@ class VBuckingham:
                          str(self.rho),
                          str(self.C6)])
 
+    @staticmethod
+    def latexTableFromListBucks(listPots, fileName = None):
+        ''' From a list of potentials, make a latex table from the Buckingham pots 
+            if fileName, write to this file, otherwise return a string '''
+        stringOut  = r'\begin{tabular}{lrrr}' + "\n"
+        stringOut += r'\toprule' + "\n"
+        stringOut += r'Species &       A &       $\rho$ &       C$_{6}$ \\' + "\n"
+        stringOut += r'\midrule' + "\n"
+
+        for p in listPots:
+            if p.__class__.__name__ == 'VBuckingham':
+                a=        " & ".join(map(str, [p.species1.element + "-" + p.species2.element,
+                                               p.A,
+                                               p.rho,
+                                               p.C6]))
+                stringOut += a + r' \\' + "\n"
+
+        stringOut += r'\bottomrule' + "\n"
+        stringOut += r'\end{tabular}' + "\n"
+
+        if fileName is not None:
+            with open(fileName, 'w') as outf:
+                outf.write(stringOut)
+
+        return stringOut
+        #change sig figs or data if ever needed
+#                print p.species1.element, p.species1.element, p.A, p.rho, p.C6
+
 class VThreeBody:
     ''' Follow 1.4.3 GULP manual (rho is inverse length)
         fitA etc are flags (ignore for now) '''
