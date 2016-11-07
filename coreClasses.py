@@ -318,8 +318,10 @@ class Structure:
     def setFracCoord(self):
         ''' CHECK CORRECT WAY AROUND!!!!!!!!!!!!!!
             assumes have lattice (vectors) set '''
-        if not self.unitCell.invVectors:
+#        if not self.unitCell.invVectors:
+        if self.unitCell.invVectors is None:
             self.unitCell.setInvVectors()
+
         for i in xrange(len(self.speciesList)):
             self.speciesList[i].fracCoord = np.dot(self.speciesList[i].cartCoord, self.unitCell.invVectors)
 
@@ -495,7 +497,6 @@ class Structure:
                 separatedList.append(self.speciesList[indexS])
                 deletionsList.append(indexS)
 
-        print deletionsList
         for i in deletionsList[::-1]:
             del(self.speciesList[i])
 
@@ -575,6 +576,24 @@ class Structure:
                           [sorted(originalStructure.get_neighbors(s, 4.), key = lambda x:x[1])[0][1] for s in sitesOriginalStructure])
 
         return originalDisps, newDisps
+
+#    def closestSpeciesInListMatchIndex(self, targetSpecies, targetCoordinate, cartesian = False, matchAttributes = ['element']):
+#        ''' Return the index of the closest Species (of correct type) '''
+#
+#        from setTools import sameElementByAttributes
+#
+#        if cartesian:
+#            raise Exception("not implemented cartesian coord in Structure.closestSpeciesMatchIndex")
+#
+#        if self.speciesList[0].fracCoord is None:
+#            self.resetFracCoords()
+#
+#        for iat, at in enumerate(self.speciesList):
+#             if not sameElementByAttributes(targetSpecies, at, matchAttributes) :
+#                 continue
+#             disp =  np.linalg.norm(targetCoordinate - at.fracCoord)
+#             if disp < minDisp and iat not in outList:
+#                 minDisp, index = disp, iat
 
     def speciesMatchIndices(self,
                             targetSpecies   = None,
