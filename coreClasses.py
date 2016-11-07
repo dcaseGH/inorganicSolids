@@ -481,6 +481,26 @@ class Structure:
         self.speciesList   = getSpeciesListCIF  (cifName)
         self.symmetryGroup = getSymmetryGroupCIF(cifName)
 
+    def removeListSpecies(self, speciesToMatch, attributes = ['element']):
+        ''' Removes a list of matching species from self.speciesList
+            Returns this list separately '''
+
+        from setTools import sameElementByAttributes
+
+        separatedList = []
+        deletionsList = []
+
+        for indexS, s in enumerate(self.speciesList):
+            if sameElementByAttributes(s, speciesToMatch, attributes):
+                separatedList.append(self.speciesList[indexS])
+                deletionsList.append(indexS)
+
+        print deletionsList
+        for i in deletionsList[::-1]:
+            del(self.speciesList[i])
+
+        return separatedList
+
     def removeSpeciesSobol(self, species, nRemove, offset = 0):
         ''' Remove nRemove species, that match character of species, according to closest fractional 
             coordinates to those from sobol list 

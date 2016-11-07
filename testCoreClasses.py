@@ -85,6 +85,22 @@ class TestStructureMethods(unittest.TestCase):
                                              tempStructure2.speciesList[:2],
                                              ['element', 'core']))
 
+    def test_removeListSpecies(self):
+        tempStructure = Structure(speciesList = [Species(element = 'Cl', fracCoord = [0.1,0.3,.4]),
+                                                 Species(element = 'Cl', core = 'shel', fracCoord = [0.1,0.3,.4]),
+                                                 Species(element = 'Na', fracCoord = [0.3,0.3,.1]),
+                                                 Species(element = 'Na', fracCoord = [0.3,0.3,.10]),
+                                                 Species(element = 'S', fracCoord = [0.2,0.3,.1], charge = 0.2),
+                                                 Species(element = 'S', fracCoord = [0.2,0.3,.1], charge = 0)
+                                                 ])
+
+        self.assertTrue(len(tempStructure.speciesList) ==6)
+        removedList = tempStructure.removeListSpecies(Species(element = 'S'))
+        self.assertTrue(len(tempStructure.speciesList) ==4 )
+        self.assertTrue(len(removedList) ==2)
+        np.testing.assert_array_almost_equal(removedList[1].fracCoord, 
+                                             [0.2, 0.3, 0.1])
+
     def test_UnitCell(self):
         ''' This had better work, as stolen from pymatget and test is crap'''
         u = UnitCell(lengths = np.array([1., 2., 3.]), angles = np.array([45., 46., 47.]))
