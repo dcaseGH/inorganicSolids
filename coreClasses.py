@@ -309,10 +309,12 @@ class Structure:
     def uniqueSpecies(self, attrList):
         ''' Return list, worry about changes if need be'''
         from setTools import subsetByAttributes
+        from copy import deepcopy
         tempList = []
         for x in self.speciesList:
             if not subsetByAttributes([x], tempList, attrList):
-                tempList.append(x)
+#                tempList.append(x)
+                tempList.append(deepcopy(x))
         return tempList
 
     def setFracCoord(self):
@@ -656,18 +658,23 @@ class Structure:
     def numberValenceElectrons(self):
         return sum([x.atomicValenceElectrons() for x in self.speciesList if x.core == 'core'])
 
-    def composition(self, considerShellsSeparately = False):
-        ''' Return dict with elements and number of times they appear (ignore the shells stuff unless needed '''
+    def composition(self, considerShellsSeparately = False, denominator = None):
+        ''' Return dict with elements and number of times they appear (ignore the shells stuff unless needed 
+            denominator divides all numbers if present '''
 
         from setTools import subsetByAttributes
+
+        if denominator:
+            return dict(zip([x.element for x in self.uniqueSpecies(['element'])],
+                            [float(len([x for x in self.speciesList if x.element == y.element and x.core[:4].lower() == 'core'])) / float(denominator) for y in self.uniqueSpecies(['element'])]))
 
         return dict(zip([x.element for x in self.uniqueSpecies(['element'])],
                         [len([x for x in self.speciesList if x.element == y.element and x.core[:4].lower() == 'core']) for y in self.uniqueSpecies(['element'])]))
 
-    def compositionString(self, considerShellsSeparately = False):
+    def compositionString(self, considerShellsSeparately = False, denominator = None):
         ''' Return a string with the composition '''
 
-        composition = self.composition(considerShellsSeparately = considerShellsSeparately)
+        composition = self.composition(considerShellsSeparately = considerShellsSeparately, denominator = denominator)
 
         return "; ".join(map(str, [" ".join(map( str, [composition[k], k])) for k in composition.keys()]))
 
