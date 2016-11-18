@@ -237,8 +237,6 @@ class VBuckingham:
                 outf.write(stringOut)
 
         return stringOut
-        #change sig figs or data if ever needed
-#                print p.species1.element, p.species1.element, p.A, p.rho, p.C6
 
 class VThreeBody:
     ''' Follow 1.4.3 GULP manual (rho is inverse length)
@@ -313,7 +311,6 @@ class Structure:
         tempList = []
         for x in self.speciesList:
             if not subsetByAttributes([x], tempList, attrList):
-#                tempList.append(x)
                 tempList.append(deepcopy(x))
         return tempList
 
@@ -349,11 +346,9 @@ class Structure:
         if self.speciesList[0].fracCoord is None:
             self.setFracCoord()
 
-        print self.speciesList[0].fracCoord
         # move fracCoord
         for i in xrange(len(self.speciesList)):
             self.speciesList[i].fracCoord += fracDisplacement
-        print self.speciesList[0].fracCoord
 
         # if using cartCoord, recalc it
         if self.speciesList[0].cartCoord is not None:

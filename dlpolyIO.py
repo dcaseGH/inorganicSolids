@@ -24,7 +24,7 @@ class dlpolyInput():
                  parentStructure    = None,
                  aseStructure       = None,
                  fileName           = None,
-                 title              = None,
+                 title              = 'Null',
                  unitCell           = None,
                  levcfg             = None,
                  imcon              = None,
@@ -284,6 +284,10 @@ class dlpolyInput():
 
         outString = "molecular types %s\n" % len(self.moleculeOrder)
         uniqueSpeciesList = [x for x in self.parentStructure.uniqueSpecies(['element', 'core'])]# if x.core == 'core']
+
+        #easy mistake to not set the mass
+        assert(all([x.mass is not None for x in self.speciesList]))
+
         for a in self.moleculeOrder:
             aAsAtom = [x for x in uniqueSpeciesList if x.element == a and x.core == 'core'][0]
             outString += a + "\n"
@@ -308,7 +312,13 @@ class dlpolyInput():
     def vdwInformationFIELD(self):
         ''' If you give superfluous potentials, perhaps DLPOLY wont like it???   '''
         from coreClasses import VBuckingham
-        twoBodyPots   = [x for x in self.potentials if isinstance(x, VBuckingham)]
+        from setTools import sameElementByAttributes
+
+        # only include the potentials which are required for this structure
+        uniqueSpeciesList = [x for x in self.parentStructure.uniqueSpecies(['element', 'core'])]# if x.core == 'core']
+        twoBodyPots   = [x for x in self.potentials if isinstance(x, VBuckingham) 
+                                                    and any([sameElementByAttributes(x.species1, y, ['element', 'core']) for y in uniqueSpeciesList])
+                                                    and any([sameElementByAttributes(x.species2, y, ['element', 'core']) for y in uniqueSpeciesList])]
 
         outString = "vdW %s\n"%len(twoBodyPots)
         for p in twoBodyPots:
