@@ -498,3 +498,69 @@ class dlpolyOutput():
 
         self.outputDF = pd.DataFrame(resultsDict)
         return self.outputDF
+
+    @staticmethod
+    def diffusionCoefficients(stringIn):
+        ''' This just returns the first approximation in units of 10^-9 m^2 / s in the OUTPUT '''
+
+        outDict = {} 
+        for l in stringIn.split('Approximate 3D Diffusion')[1].split('Average pressure tensor')[0].split("\n")[3:-3]:
+            outDict[l.split()[0]] = float(l.split()[1])
+
+        return outDict
+
+
+class DLPOLYHistory():
+    ''' These things are perhaps too big??? Try to save all info in one- if not possible, perhaps find a work around '''
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def makePMGStructureList(historyFileName, ignoreShells = True):
+        ''' reads historyFileName and returns a list of PMG structures '''
+        from pymatgen.core.lattice   import Lattice   as PMGL
+        from pymatgen.core.structure import Structure as PMGS
+
+        structureList = []
+
+        with open(historyFileName, 'r') as inFile:
+            for timestep in inFile.read().split('timestep')[1:]:
+                lines = timestep.split('\n')
+
+                # note- possibly the lattice is written to terrible accuracy-- why would dlpoly do this????
+                lattice = PMGL( np.array([x.split() for x in lines[1:4]], dtype='float64') )
+
+                species, coords = [], []
+
+                offset = 4
+                for ix, x in enumerate(lines[offset:]):
+                    if ix%2==0:
+                        if ignoreShells and 'shl' in x.split()[0]:
+                            continue
+                        else:
+                            species.append(x.split()[0].replace('_', ''))
+                            coords.append( np.array(lines[ix+1+offset].split(), dtype='float64') )
+
+                structureList.append( PMGS(lattice,
+                                           species,
+                                           coords,
+                                           coords_are_cartesian = True) 
+                                    )
+
+        return structureList
+
+    @staticmethod
+    def initPMGDiffusionAnalyzer():
+        ''' Add controls here, e.g. put in a wrapper with specie selection  '''
+        from pymatgen.analysis.diffusion_analyzer import DiffusionAnalyzer
+
+        return DiffusionAnalyzer.from_structures( structures,
+                                                  specie,
+                                                  temperature,
+                                                  time_step,
+                                                  step_skip,
+                                                  smoothed="max",
+                                                  min_obs=30,
+                                                  avg_nsteps=1000,
+                                                  initial_disp=None,
+                                                  initial_structure=None)
