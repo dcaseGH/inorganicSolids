@@ -50,7 +50,14 @@ class TestSetTests(unittest.TestCase):
                                             ['element', 'core']))
 
 
-
+class TestPotentials(unittest.TestCase):
+    def test_buckingham(self):
+        from savedPotentials import currentPotentialSet311016
+        self.assertTrue('Li' in  [x.species1.element for x in currentPotentialSet311016 if x.__class__.__name__ == 'VBuckingham'])
+        self.assertTrue(len(currentPotentialSet311016) == 7)
+        currentPotentialSet311016 = VBuckingham.removeSpeciesFromListBucks(currentPotentialSet311016, Species(element='Li'))
+        self.assertFalse('Li' in [x.species1.element for x in currentPotentialSet311016 if x.__class__.__name__ == 'VBuckingham'])
+        self.assertTrue(len(currentPotentialSet311016) == 6)
 
 #class TestSpeciesMethods(unittest.TestCase):
 #    def test_sameAttributes(self):

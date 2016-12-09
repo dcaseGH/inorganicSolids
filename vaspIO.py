@@ -4,6 +4,8 @@ import fortranformat as ff
 fortranWriter= ff.FortranRecordWriter('(3f15.10)')
 
 class VaspInput():
+    ''' Order of atoms important,,, but why called molecule order????  '''
+
     def __init__(self,
                  parentStructure    = None,
 #                 aseStructure       = None,
@@ -53,6 +55,18 @@ class VaspInput():
         ''' Just numbers of atoms in self.moleculeOrder '''
         for m in self.moleculeOrder:
             yield len([x for x in self.speciesList if x.element == m and x.core.lower() == 'core'])
+
+
+    def generatePOTCARString(self,
+                             potcarDirectory = '/Users/cmdc2-extra/Work/potPAW_PBE.54/',
+                             extraDirectoryInformation = None):
+
+        ''' If you need to add extra information, do this later  '''
+
+        if not self.moleculeOrder:
+            self.alphabeticalMoleculeOrder()
+
+        return ''.join([open(potcarDirectory + el + '/POTCAR', 'r').read() for el in self.moleculeOrder])
 
 #    @classmethod
     def generatePOSCARString(self,

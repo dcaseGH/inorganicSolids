@@ -516,16 +516,86 @@ class DLPOLYHistory():
         pass
 
     @staticmethod
-    def makePMGStructureList(historyFileName, ignoreShells = True):
-        ''' reads historyFileName and returns a list of PMG structures '''
+    def makeCifFromHistory(historyFileName, inCifFileName = None, specie = None, outCifFileName = 'overlayedStructure.cif', subSection = None):
+        ''' Intended to take all lithium sites in history, and add to a cif
+            Other atoms are in the cif original positions '''
+
+        from coreClasses import Structure, Species
+        from cifIO import writeCIF
+
+        # this is a mess- change functionality when know what want from it
+        if inCifFileName:
+            baseStructure = Structure.fromCIF(inCifFileName)
+            if specie:
+                baseStructure.removeListSpecies(Species(element = specie))
+        
+        # check removed Li
+        assert(len([x for x in baseStructure.speciesList if x.element == specie]) == 0)
+
+        baseStructure.speciesList += [Species(element   = specie,
+                                              fracCoord = x) for x in DLPOLYHistory.makeListPositions(historyFileName,
+                                                                                                      selectOnlySpecie = specie,
+                                                                                                      maxStructures = 100)]
+
+        print 'sibib', subSection
+        if subSection is not None:
+            newStructure = baseStructure.subSection(baseStructure, subSection)
+            baseStructure = newStructure
+
+        writeCIF(outCifFileName, baseStructure)
+
+    @staticmethod
+#    def makeListPositions(historyFileName, kwargs):
+    def makeListPositions(historyFileName, selectOnlySpecie = False, ignoreShells = True, maxStructures = None,
+                          fracCoord = True, cartCoord = False, addOrigin = True):
+        ''' Top two lines have a title and also the number of atoms 
+            Adding a dummy atom at the origin is essential for pmg diffusion analysis '''
+
+#        structures = DLPOLYHistory.makePMGStructureList(historyFileName, **kwargs)
+        structures = DLPOLYHistory.makePMGStructureList(historyFileName, selectOnlySpecie = selectOnlySpecie, ignoreShells = ignoreShells, maxStructures = maxStructures)
+
+        # do I want fractional coords ???
+        if fracCoord:
+            return np.array([x._fcoords for y in structures for x in y._sites])
+        else:
+            return None #not implemented yet
+
+
+    @staticmethod
+    def makePMGStructureList(historyFileName, selectOnlySpecie = False, ignoreShells = True, maxStructures = None, addOrigin = True):
+        ''' reads historyFileName and returns a list of PMG structures
+            put initial structure index in if needed '''
         from pymatgen.core.lattice   import Lattice   as PMGL
         from pymatgen.core.structure import Structure as PMGS
 
+        ''' Top two lines have a title and also the number of atoms 
+            Adding a dummy atom at the origin is essential for pmg diffusion analysis '''
         structureList = []
 
-        with open(historyFileName, 'r') as inFile:
-            for timestep in inFile.read().split('timestep')[1:]:
-                lines = timestep.split('\n')
+        topBufferLines = 2
+        counter        = 0
+        lines          = []
+        for line in open(historyFileName):
+            counter += 1
+            if counter <= topBufferLines:
+                nAtoms = line.split()[-1]
+                continue
+
+            timestepBufferLines = int(nAtoms) * 2 + 4
+            lines.append(line)
+
+            if len(lines) == timestepBufferLines:
+#            if (counter - topBufferLines)% timestepBufferLines == 0:
+#        counter = 0
+
+#        while True:
+#            counter = 0
+#            lines   = []
+
+
+#        with open(historyFileName, 'r') as inFile:
+#            for timestep in inFile.read().split('timestep')[1:]:
+#                lines = timestep.split('\n')
 
                 # note- possibly the lattice is written to terrible accuracy-- why would dlpoly do this????
                 lattice = PMGL( np.array([x.split() for x in lines[1:4]], dtype='float64') )
@@ -535,11 +605,18 @@ class DLPOLYHistory():
                 offset = 4
                 for ix, x in enumerate(lines[offset:]):
                     if ix%2==0:
-                        if ignoreShells and 'shl' in x.split()[0]:
+
+                        if x == '' or (ignoreShells and 'shl' in x.split()[0]):
+                            continue
+                        elif selectOnlySpecie and x.split()[0].replace('_', '') != selectOnlySpecie:
                             continue
                         else:
                             species.append(x.split()[0].replace('_', ''))
                             coords.append( np.array(lines[ix+1+offset].split(), dtype='float64') )
+
+                if selectOnlySpecie and addOrigin:
+                    species.append('X')
+                    coords.append(np.zeros(3))
 
                 structureList.append( PMGS(lattice,
                                            species,
@@ -547,20 +624,41 @@ class DLPOLYHistory():
                                            coords_are_cartesian = True) 
                                     )
 
+                if maxStructures and len(structureList)>= maxStructures:
+                    return structureList
+
+                lines = []
+
         return structureList
 
     @staticmethod
-    def initPMGDiffusionAnalyzer():
+    def initPMGDiffusionAnalyzer(*args, **kwargs):
         ''' Add controls here, e.g. put in a wrapper with specie selection  '''
         from pymatgen.analysis.diffusion_analyzer import DiffusionAnalyzer
 
-        return DiffusionAnalyzer.from_structures( structures,
-                                                  specie,
-                                                  temperature,
-                                                  time_step,
-                                                  step_skip,
-                                                  smoothed="max",
+        if 'smoothed' not in kwargs.keys():
+            kwargs['smoothed'] = 'max'
+
+        if 'maxStructures' not in kwargs.keys():
+            kwargs['maxStructures'] = None
+
+        if 'selectOnlySpecie' in kwargs.keys() and kwargs['selectOnlySpecie']:
+            selectOnlySpecie = kwargs['specie']
+            print "--- Warning, without all species there is no drift to be calculated ---"
+            print "---            Use this for quick calculations only                 ---"                                
+        else:
+            selectOnlySpecie = False
+
+        return DiffusionAnalyzer.from_structures( DLPOLYHistory.makePMGStructureList(kwargs['historyFileName'],
+                                                                                     selectOnlySpecie = selectOnlySpecie,
+                                                                                     maxStructures = kwargs['maxStructures']),
+                                                  kwargs['specie'],
+                                                  kwargs['temperature'],
+                                                  kwargs['time_step'],
+                                                  kwargs['step_skip'],
+                                                  smoothed=kwargs['smoothed'],
                                                   min_obs=30,
                                                   avg_nsteps=1000,
                                                   initial_disp=None,
-                                                  initial_structure=None)
+                                                  initial_structure=None
+                                                  )

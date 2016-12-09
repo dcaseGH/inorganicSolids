@@ -213,6 +213,18 @@ class VBuckingham:
                          str(self.C6)])
 
     @staticmethod
+    def removeSpeciesFromListBucks(listPots, species, attributeList = ['element']):
+        ''' listPots can be non buckingham, but just remove elements which are 
+            buckingham and contain species '''
+
+        from setTools import sameElementByAttributes
+
+        return [x for x in listPots if x.__class__.__name__ != 'VBuckingham' 
+                                    or (not sameElementByAttributes(x.species1, species, attributeList)
+                                    and not sameElementByAttributes(x.species2, species, attributeList))]
+
+
+    @staticmethod
     def latexTableFromListBucks(listPots, fileName = None):
         ''' From a list of potentials, make a latex table from the Buckingham pots 
             if fileName, write to this file, otherwise return a string '''
@@ -303,6 +315,26 @@ class Structure:
         self.unitCell      = unitCell
         self.speciesList   = speciesList
         self.symmetryGroup = symmetryGroup
+
+    @classmethod
+    def subSection(cls, parentStructure, limits):
+        ''' Returns new structure which is cut-out
+            just take the bit between limits (in frac coords)
+            should use a P1 cell 
+            limits are np.array([[lower bound vector], [upper bound vector]])'''
+
+        lengthReductionRatio = limits[1] - limits[0]
+        invRatio             = np.array([1./x for x in lengthReductionRatio])
+
+        newSpeciesList = [x for x in parentStructure.speciesList if all([x.fracCoord[i] < limits[1][i] for i in xrange(3)]) and
+                                                                            all([x.fracCoord[i] > limits[0][i] for i in xrange(3)])]
+
+        for i in xrange(len(newSpeciesList)):
+            tempFC = newSpeciesList[i].fracCoord * invRatio
+            newSpeciesList[i].fracCoord = tempFC - np.floor(tempFC)
+
+        return cls(unitCell    = UnitCell(vectors = np.array([parentStructure.unitCell.vectors[i] * (limits[1][i] - limits[0][i])  for i in xrange(3)])),
+                   speciesList = newSpeciesList)
 
     def uniqueSpecies(self, attrList):
         ''' Return list, worry about changes if need be'''

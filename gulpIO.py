@@ -91,10 +91,17 @@ class OutputFileGULP():
                 'newAngles' : np.array(newAngles),
                 'newLengths': np.array(newLengths)}
 
-    @classmethod
-    def phononFrequencies(self, inputString):
+#    @classmethod
+    @staticmethod
+#    def phononFrequencies(self, inputString):
+    def phononFrequencies(inputString):
         phonString = inputString.split('Frequencies (cm-1) [NB: Negative implies an imaginary mode]:\n\n')[1].split('\n\n\n')[0]
         return np.array(map( float, phonString.replace('\n', '').split() ))
+
+    @staticmethod
+    def phononFrequenciesPositive(inputString):
+        ''' They are ordered so zeroth frequency will suffice to check all >=0 '''
+        return OutputFileGULP.phononFrequencies(inputString)[0] > -0.001
 
     @classmethod
     def defectEnergy(self, inputString):

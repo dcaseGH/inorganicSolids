@@ -39,6 +39,25 @@ class TestDLPOLYHistory(unittest.TestCase):
         np.testing.assert_array_almost_equal(pmgStructures[0]._sites[-1]._coords,
                                              np.array([-4.2747E+00, -2.3676E+00, -1.5118E+01]))
 
+    def testInitPMGDiffusionAnalyzer(self):
+        from dlpolyIO import DLPOLYHistory
+        pmgDA = DLPOLYHistory.initPMGDiffusionAnalyzer(historyFileName = 'testFiles/exampleLATPHISTORY',
+                                                       temperature     = 0,
+                                                       specie          = 'Li',
+                                                       time_step       = 5.e-9,
+                                                       step_skip       = None)
+
+    def testSelectOnlySpecie(self):
+        from dlpolyIO import DLPOLYHistory
+        pmgStructures = DLPOLYHistory.makePMGStructureList('testFiles/exampleLATPHISTORY',
+                                                           selectOnlySpecie = 'Li')
+
+        # it equals 423, because an extra point is included at origin
+        self.assertEqual(len(pmgStructures[0]), 423)
+
+#        pmgDA
+        #print pmgDA.__dict__
+
 if __name__ == '__main__':
     unittest.main()
 
