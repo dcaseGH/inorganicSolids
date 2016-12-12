@@ -77,6 +77,12 @@ class Species:
          from hardcode import atomicValenceElectrons
          return atomicValenceElectrons[self.element]
 
+    def defaultCharge(self):
+        ''' Use this v. sparingly 
+            Do not assume charges are standard- always specify except for quick plots etc '''
+        from hardcode import defaultCharges
+        return defaultCharges[self.element]
+
 class Defect():#Species):
     # Do super classes later- python 2 vs 3 issues (and I did it wrong the first time)
     def __init__(self,
@@ -182,9 +188,19 @@ class VBuckingham:
         self.cutMin   = cutMin
         self.cutMax   = cutMax
 
-    def energy(self, r):
-        ''' Units are same as A or C6, r is rho^{-1} '''
-        return self.A * np.exp(-r / self.rho) - self.C6 * r **-6 
+    def energy(self, r, chargeProduct = None):
+        ''' Units are same as A or C6, r is rho^{-1} 
+            Set chargeProduct to 'auto' if want to use defaults (check before using, e.g. Fe 2/3+ and so on) '''
+        from hardcode import hartrees2eV, bohr2angstrom
+
+        if type(chargeProduct) == float:
+            return self.A * np.exp(-r / self.rho) - self.C6 * r **-6             
+        elif type(chargeProduct) == str and chargeProduct.lower() == 'auto':
+            return self.species1.defaultCharge() * self.species2.defaultCharge() * hartrees2eV * (r / bohr2angstrom)**-1 +\
+                   self.A * np.exp(-r / self.rho) - self.C6 * r **-6 
+        else:
+            return self.A * np.exp(-r / self.rho) - self.C6 * r **-6 
+
 
     def stringForm(self):
         ''' specify potential labels if you want different types of same atom 
@@ -249,6 +265,28 @@ class VBuckingham:
                 outf.write(stringOut)
 
         return stringOut
+
+    @staticmethod
+    def plotListBuckinghams(listPots, nPts = 100, xBounds = [1., 8.], figsize=(10,10),
+                            speciesList = None, matchAttributes = ['element']):
+        ''' Make a matplotlib output for each VBuckingham '''
+        import matplotlib.pyplot as plt
+        from setTools import subsetByAttributes
+
+        listBucks = [x for x in listPots if x.__class__.__name__ == 'VBuckingham' and
+                                            subsetByAttributes([x.species1], speciesList, matchAttributes) and
+                                            subsetByAttributes([x.species2], speciesList, matchAttributes)]
+
+        xPts      = [min(xBounds) + (max(xBounds) - min(xBounds)) * x/nPts for x in xrange(nPts)]
+        plt.subplots(figsize=figsize)
+        for i, lb in enumerate(listBucks):
+            plt.subplot(len(listBucks), 1, i)
+            plt.plot(xPts, [lb.energy(x, chargeProduct='auto') for x in xPts])
+            plt.title(lb.species1.element + "_" + lb.species2.element)
+
+        plt.show()
+#        return listBucks
+
 
 class VThreeBody:
     ''' Follow 1.4.3 GULP manual (rho is inverse length)
