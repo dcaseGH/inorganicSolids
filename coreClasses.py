@@ -758,3 +758,27 @@ class Structure:
                                             [x.element   for x in self.speciesList if x.core[:4] == 'core'],
                                             [x.fracCoord for x in self.speciesList if x.core[:4] == 'core'])
         return outStructure
+
+    def xyzString(self, includeShells=False, includeCellVectors=False):
+        ''' make .xyz format, for PLUMED for e.g. '''
+        import copy
+
+        #print a dummy structure with atoms reordered
+        newStructure = copy.deepcopy(self)
+        newStructure.speciesList = sorted([x for x in self.speciesList], key = lambda x: x.element)
+
+        if newStructure.speciesList[0].cartCoord is None:
+            newStructure.setCartCoord()
+
+        outString = str(len([x for x in newStructure.speciesList if x.core[:4].lower() == 'core' or includeShells])) + "\n"
+
+        # possibly include cell lengths- periodicity may not be possible in Plumed???
+        if includeCellVectors:
+            outString += " ".join(map(str, list(newStructure.unitCell.vectors.ravel()))) + "\n"
+        else:
+            outString += " Not included cell vectors\n"
+
+        outString += "\n".join([" ".join([x.element] + map(str, x.cartCoord)) for x in newStructure.speciesList if x.core[:4].lower() == 'core' or includeShells])
+
+        # the \n is essential for PLUMED
+        return outString + "\n"
