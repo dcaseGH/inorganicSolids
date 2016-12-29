@@ -337,13 +337,33 @@ class VThreeBody:
 # buck coulomb.. inherit buckingham and coulomb
 
 class SymmetryGroup:
+    ''' Most likely a space group (point groups are for molecules)
+        elementList is going to be in pmg form (so use element.affine_matrix '''
     def __init__(self,
                  labelHM     = None,
                  number      = None,
                  elementList = []):
         self.labelHM     = labelHM
         self.number      = number
-        self.elementList = []
+        self.elementList = elementList
+
+    @classmethod
+    def from_cif(cls, fileName):
+        ''' wrapper- could be useful to use pmg stuff '''
+
+        from pymatgen.core import Structure as PMGS
+        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+        analyzer = SpacegroupAnalyzer(PMGS.from_file(fileName))
+        return cls(labelHM     = analyzer.get_spacegroup_symbol(),
+                   number      = analyzer.get_spacegroup_number(),
+                   elementList = analyzer.get_spacegroup())
+
+#    def applyElement(self, index, point):
+#        return point
+
+#    @staticmethod
+#    def applyStringOperation(stringOp, point):
+#        return point
 
 class Structure:
     def __init__(self,

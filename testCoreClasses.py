@@ -2,6 +2,14 @@ import unittest
 from coreClasses import *# Structure
 from setTools import *
 
+class TestSymmetryGroup(unittest.TestCase):
+    def test_symmetryGroup(self):
+        sg = SymmetryGroup.from_cif('testFiles/example.cif')
+        self.assertEqual(sg.number, 167)
+        self.assertEqual(sg.labelHM, 'R-3c')
+        self.assertEqual(len(sg.elementList), 36)
+
+
 class TestHardcode(unittest.TestCase):
     def test_timeStringToFloat(self):
         from hardcode import timeStringToFloat
