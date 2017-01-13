@@ -97,6 +97,30 @@ def getSymmetryGroupCIF(inputFile):
     return SymmetryGroup(labelHM = labelHM,
                          number  = number)
 
+def loopToDict(loop):
+    ''' Takes a loop_ from a cif, and returns a dictionary '''
+
+    keys = [line for line in loop.split() if line.startswith('_')] 
+
+    data = []
+    for line in loop.split():
+        if 'loop_' in line or any([k in line for k in keys]):
+            continue
+        else:
+            data.append(line.split())
+    print keys, data
+    outDict = {}
+    for i,x in enumerate(keys):
+        outDict[x] = [d[i] for d in data]
+    return outDict
+
+
+def getSymmetryOperationsCIFstring(inputString):
+    for l in inputString.split('loop_'):
+        if '_symmetry_equiv_pos_site_id' not in l:
+            continue
+        return loopToDict(l)['_symmetry_equiv_pos_as_xyz']
+
 def getUnitCellCIF(inputFile):
     ''' atm only reads things in precise order and format dhc 190716
         should ignore decimals in parentheses  

@@ -55,6 +55,21 @@ class TestDLPOLYHistory(unittest.TestCase):
         # it equals 423, because an extra point is included at origin
         self.assertEqual(len(pmgStructures[0]), 423)
 
+    def testMakeListPositions(self):
+        from dlpolyIO import DLPOLYHistory
+        firstCartPosition = DLPOLYHistory.makeListPositions('testFiles/exampleLATPHISTORY', fracCoord = False, cartCoord = True)[0]
+        np.testing.assert_array_almost_equal(np.array([-4.2284E+00, -2.4074E+00, -4.1802E+00]),
+                                             firstCartPosition)
+
+        cellVectors = np.array([[  42.18,      0.1496E-01, -0.1179E-01],
+                                [ -21.08,       36.51,      0.7080E-02],
+                                [-0.1341E-01,  0.2270E-02,   43.56]])
+
+        firstFracPosition = DLPOLYHistory.makeListPositions('testFiles/exampleLATPHISTORY')[0]
+        np.testing.assert_array_almost_equal(np.array([-4.2284E+00, -2.4074E+00, -4.1802E+00]),
+                                             np.dot(firstFracPosition, cellVectors))
+
+
 #        pmgDA
         #print pmgDA.__dict__
 

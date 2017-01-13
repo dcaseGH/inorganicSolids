@@ -135,7 +135,12 @@ class dlpolyInput():
             levcfgIn = int(lines[1].split()[0])
             imcon    = int(lines[1].split()[1])
             natms    = int(lines[1].split()[2])
-            engcfg   = float(lines[1].split()[3])
+
+            #energy of configuration is not essential
+            try:
+                engcfg   = float(lines[1].split()[3])
+            except:
+                engcfg   = None
 
             if levcfg is None:
                 levcfg = levcfgIn
@@ -557,8 +562,8 @@ class DLPOLYHistory():
         # do I want fractional coords ???
         if fracCoord:
             return np.array([x._fcoords for y in structures for x in y._sites])
-        else:
-            return None #not implemented yet
+        elif cartCoord:
+            return np.array([x._coords for y in structures for x in y._sites])
 
 
     @staticmethod

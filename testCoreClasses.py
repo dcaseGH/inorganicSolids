@@ -4,10 +4,18 @@ from setTools import *
 
 class TestSymmetryGroup(unittest.TestCase):
     def test_symmetryGroup(self):
-        sg = SymmetryGroup.from_cif('testFiles/example.cif')
+        sg = SymmetryGroup.fromCif('testFiles/example.cif')
         self.assertEqual(sg.number, 167)
         self.assertEqual(sg.labelHM, 'R-3c')
         self.assertEqual(len(sg.elementList), 36)
+
+        testPt = np.array([2.3, -1.2, 3.4])
+        np.testing.assert_array_almost_equal( sg.elementList[1].operate(testPt),
+                                              np.array([-2.3,  1.2, -3.4]) )
+
+        self.assertEqual(len( sg.generateUniquePoints([testPt])), 36 )
+        self.assertEqual(len(  sg.generateUniquePoints([testPt] + [np.array([0.2903, 0., 0.25])], boundUnitCell = True)),
+                               36 + 18)
 
 
 class TestHardcode(unittest.TestCase):
@@ -183,6 +191,17 @@ class TestStructureMethods(unittest.TestCase):
                                              np.array([0.9891, 0.0002, 0.5028]), decimal = 4)
         np.testing.assert_array_almost_equal(tempSpecies.cartCoord,
                                              np.array([8.1429, 0.0015, 10.5466]), decimal = 4)
+
+
+    def test_changeUnitCell(self):
+        from coreClasses import Structure
+        structure = Structure.fromCIF('testFiles/exampleNeighbours.cif')
+        oldNAtoms = len(structure.speciesList)
+        newLimits = np.array([[-0.5,0.5], [-0.5, 0.5], [1.5, 2.3]])
+        structure.changeUnitCell(newLimits) 
+        self.assertTrue(all([x.fracCoord[0] >= newLimits[0, 0] and x.fracCoord[0] < newLimits[0, 1] and 
+                             x.fracCoord[1] >= newLimits[1, 0] and x.fracCoord[1] < newLimits[1, 1] and 
+                             x.fracCoord[2] >= newLimits[2, 0] and x.fracCoord[2] < newLimits[2, 1] for x in structure.speciesList]))
 
 
 class TestSpeciesMethods(unittest.TestCase):

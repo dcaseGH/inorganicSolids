@@ -115,12 +115,27 @@ VBuckingham(species1 = Species(element = 'O', core='shel'),
                                  species2 = Species(element = 'O',  core='shel'),
                                  A        = 1761.207581 ,
                                  rho      = 0.292213 ,
-                                 C6       = 0.0)]
-}
+                                 C6       = 0.0)],
+
+'tempBVParameters120117':[
+                          VBuckingham(species1 = Species(element = 'V'),
+                                      species2 = Species(element = 'O', core='shel'),
+                                      A        = 1.00535801e+03,
+                                      rho      = 3.55733223e-01,
+                                      C6       = 0.),
+                          VBuckingham(species1 = Species(element = 'B'),
+                                      species2 = Species(element = 'O', core='shel'),
+                                      A        = 715.917969,
+                                      rho      = 0.298132,
+                                      C6       = 0.)
+                          ]}
+                          
+
 
 currentPotentialSet141016 = savedPotentials['lowestLTPSearch'] + savedPotentials['lowestAlTiOSearch']
 currentPotentialSet271016 = savedPotentials['lowestLTPSearch_TiOModified'] + savedPotentials['lowestAlTiOSearch']
 currentPotentialSet311016 = savedPotentials['lowestLTPSearch_TiOModified'] + savedPotentials['lowestAlTiOSearch'] + [savedPotentials['islamLFP'][3]]
+tempBVPotential120117     = currentPotentialSet311016 + savedPotentials['tempBVParameters120117']
 
 
 ''' islamLFP is modification of http://www.rsc.org/suppdata/c5/ta/c5ta09418f/c5ta09418f1.pdf

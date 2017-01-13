@@ -1,6 +1,7 @@
 ''' Write your links and so on here '''
 
-GULP_EXE = '/Users/cmdc2-extra/Work/gulp-4.4/Src/gulp'
+GULP_EXE           = '/Users/cmdc2-extra/Work/gulp-4.4/Src/gulp'
+PLUMED_EXE         = '/Users/cmdc2-extra/Work/Plumed/plumed2-master/src/lib/plumed'
 CIF_FILE_DIRECTORY = '/Users/cmdc2-extra/Work/icsdFiles/'
 
 hartrees2eV   = 27.211396132
@@ -19,6 +20,36 @@ def timeStringToFloat(s):
                'w': 7. * 24. * 60.**2.}
 
     return float(s[:-1]) * seconds[s[-1].lower()]
+
+def groupIntegers(listIn, returnString = True):
+    ''' E.g. if you want to return the numbers of the atoms in some list '''
+    from itertools import groupby
+    from operator import itemgetter
+    
+    for k, g in groupby(enumerate(listIn), lambda (i, x): i-x):
+        if returnString:
+            #possibly need to save this as another object if using more than once???
+            myList = map(itemgetter(1),g)
+            return ",".join([str(min(myList)) + "-" + str(max(myList))])
+        else:
+            return map(itemgetter(1), g)
+
+#### DO THIS ANOTHER TIME IF NEEDED
+#def fractionalStoichiometryByWeight(components, returnOrderedDict = True):
+#    ''' input is dictionary, e.g. {['LiV']: 20., ['BO2']: 80.}
+#        output is dictionary of each element and also its stoichiometry '''
+    
+#    for i,j in components.items():
+        
+    
+    #sum fractions to 1.
+#    assert(abs(sum([x[1] for x in speciesFraction.items()]) - 1.) < 0.0001)
+#    if returnOrderedDict:
+#        from collections import OrderedDict
+#        return
+#    else:
+#        return stoichiometryDict
+
 
 atomicValenceElectrons = {
 'H' : 1,

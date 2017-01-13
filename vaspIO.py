@@ -156,7 +156,7 @@ if __name__ == "__main__":
         from coreClasses import Structure
         POSCARName = 'CIF_POSCAR'
         with open(POSCARName, 'w') as outf:
-            vaspIn = VaspInput(parentStructure = Structure.fromCIF(args.poscarCif))
+            vaspIn = VaspInput(parentStructure = Structure.fromCIF(args.poscarCif, expandFullCell=True))
             outf.write(vaspIn.generatePOSCARString())
 
     if args.initialCifXml:

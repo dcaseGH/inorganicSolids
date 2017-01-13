@@ -189,7 +189,7 @@ class VBuckingham:
         self.cutMax   = cutMax
 
     def energy(self, r, chargeProduct = None):
-        ''' Units are same as A or C6, r is rho^{-1} 
+        ''' Units are same as A or C6, r is rho^{-1} (what does this mean???)
             Set chargeProduct to 'auto' if want to use defaults (check before using, e.g. Fe 2/3+ and so on) '''
         from hardcode import hartrees2eV, bohr2angstrom
 
@@ -338,7 +338,8 @@ class VThreeBody:
 
 class SymmetryGroup:
     ''' Most likely a space group (point groups are for molecules)
-        elementList is going to be in pmg form (so use element.affine_matrix '''
+        elementList is going to be in pmg form (so use element.affine_matrix)
+        self.elementList[0].__class__ = <class 'pymatgen.core.operations.SymmOp'> '''
     def __init__(self,
                  labelHM     = None,
                  number      = None,
@@ -348,7 +349,7 @@ class SymmetryGroup:
         self.elementList = elementList
 
     @classmethod
-    def from_cif(cls, fileName):
+    def fromCif(cls, fileName):
         ''' wrapper- could be useful to use pmg stuff '''
 
         from pymatgen.core import Structure as PMGS
@@ -358,12 +359,23 @@ class SymmetryGroup:
                    number      = analyzer.get_spacegroup_number(),
                    elementList = analyzer.get_spacegroup())
 
-#    def applyElement(self, index, point):
-#        return point
+    def generateUniquePoints(self, testPts, cut = 1.e-5, boundUnitCell = False):
+        outList = []
 
-#    @staticmethod
-#    def applyStringOperation(stringOp, point):
-#        return point
+        for t in testPts:
+            for e in self.elementList:
+#            for x in e.operate_multi(testPts):
+
+                x = e.operate(t)
+                if boundUnitCell:
+                    testPoint = x - np.floor(x)
+                else:
+                    testPoint = x
+
+                if not any([np.linalg.norm(testPoint - y) < cut for y in outList]):
+                    outList.append(testPoint)
+
+        return np.array(outList)
 
 class Structure:
     def __init__(self,
@@ -393,6 +405,41 @@ class Structure:
 
         return cls(unitCell    = UnitCell(vectors = np.array([parentStructure.unitCell.vectors[i] * (limits[1][i] - limits[0][i])  for i in xrange(3)])),
                    speciesList = newSpeciesList)
+
+    def changeUnitCell(self, inLimits):
+        ''' Changes this unit cell, such that atoms are now between new limits 
+            N.B. only an origin at 0,0,0 is used for definition of unit cell atm 
+            and this subroutine assumes that input self is in usual cell convention - [0,1)^3 (I believe) '''
+
+        # ensure min first
+        limits = np.array([[min(l), max(l)] for l in inLimits])
+
+        # upper limit is ceil because start in 0,1 and xrange stops before this number- to things cancel 
+        possibleTranslations = np.array([[a, b, c] for a in xrange(int(np.floor(limits[0, 0])), int(np.ceil(limits[0, 1])))
+                                                   for b in xrange(int(np.floor(limits[1, 0])), int(np.ceil(limits[1, 1])))
+                                                   for c in xrange(int(np.floor(limits[2, 0])), int(np.ceil(limits[2, 1])))])
+
+
+
+
+#        print possibleTranslations
+        if self.speciesList[0].fracCoord is None:
+            self.setFracCoord()
+
+        newSpeciesList = []
+        for ns, s in enumerate(self.speciesList):
+            for p in possibleTranslations:
+                newPt = s.fracCoord + p
+                if newPt[0] >= limits[0, 0] and newPt[0] < limits[0, 1] and\
+                   newPt[1] >= limits[1, 0] and newPt[1] < limits[1, 1] and\
+                   newPt[2] >= limits[2, 0] and newPt[2] < limits[2, 1]:
+                    newSpeciesList.append(Species(element   = s.element,
+                                                  core      = s.core,
+                                                  fracCoord = newPt))
+
+        self.speciesList = newSpeciesList
+        # catch errors hopefully with this
+        self.unitCell    = None
 
     def uniqueSpecies(self, attrList):
         ''' Return list, worry about changes if need be'''
