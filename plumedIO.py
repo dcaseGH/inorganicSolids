@@ -12,24 +12,50 @@ class PlumedInput():
     def __init__(self):
         pass
 
-#    def inString(self):
-#        
+    @staticmethod
+#    def q4q6Array(structure,
+#                  centralSpecies,
+#                  coordinateSpecies,
+#                  kwargs):
+    def q4q6Array(*args,
+                  **kwargs):
+#                  r_0 = 1.0,
+#                  d_0 = 0.):
+        ''' Make table of (q4, q6) 
+            Maintain order so that points can be identified within structure '''
+
+        kwargs['angMo'] = 4
+        q4Dict = PlumedInput.qlFromStructure(*args, **kwargs)
+
+        kwargs['angMo'] = 6
+        q6Dict = PlumedInput.qlFromStructure(*args, **kwargs)
+
+        orderedKeys = sorted( map(int, ([x.replace('.mean', '').replace('q6_', '') for x in q6Dict.keys()])) )
+
+        return np.array([[q4Dict['q4_' + i + '.mean'], q6Dict['q6_' + i + '.mean']] for i in map(str, orderedKeys)])
+
 
     @staticmethod
-    def q6FromStructure(structure,
+    def qlFromStructure(structure,
                         centralSpecies,
                         coordinateSpecies,
+                        angMo      = None,
                         neatenFile = True,
                         cleanFiles = True,
-                        r_0 = 1.0,
+                        r_0        = 1.0,
+                        nn         = None,
                         xyzFile    = 'plumed.xyz',
                         datFile    = 'plumed.dat',
                         colvarFile = 'COLVAR'):
 
+        ''' Assume switching function is along the lines of (1 - ((r - d0)/r0)**n) / (1-((r-d0)/r0)**m) 
+            Leave n, m as defaults (NN, MM in PLUMED) - d0 should aim to include 1st solvation shell
+            r_0 -> makes it very sharp '''
+
         from subprocessHandling import RunCommandNew
 
         outDict = {}
-        print 'assert structure is P1'
+#        print 'assert structure is P1'
 
         datString = ''
         # Plumed uses numbers from 1, not 0
@@ -42,11 +68,14 @@ class PlumedInput():
         else:
             coordString = ','.join(map(str, coordinateIndices))
 
-        
+        labelPrefix = "q%s_" % angMo
         for c in centralIndices:
-            datString += "Q6 SPECIESA=%s SPECIESB=%s R_0=%s MEAN LABEL=%s\n" %(c, coordString, r_0, "q6_" + str(c))
+            if nn is not None:
+                datString += "Q%s SPECIESA=%s SPECIESB=%s R_0=%s NN=%s MEAN LABEL=%s\n" %(angMo, c, coordString, r_0, nn, labelPrefix + str(c))
+            else:
+                datString += "Q%s SPECIESA=%s SPECIESB=%s R_0=%s MEAN LABEL=%s\n" %(angMo, c, coordString, r_0, labelPrefix + str(c))
 
-        datString += 'PRINT ARG=' + ','.join(['q6_'+str(c)+'.mean' for c in centralIndices]) + " FILE=%s\n" % colvarFile
+        datString += 'PRINT ARG=' + ','.join([labelPrefix+str(c)+'.mean' for c in centralIndices]) + " FILE=%s\n" % colvarFile
 
         with open(xyzFile, 'w') as outf:
             outf.write(structure.xyzString(includeCellVectors=True))
@@ -56,8 +85,6 @@ class PlumedInput():
         
         runner = RunCommandNew(PLUMED_EXE + " driver --plumed %s  --ixyz %s"%(datFile, xyzFile))
         runner.run(timeout=100.)
-
-        print datString
 
         with open(colvarFile, 'r') as inFile:            
             #change this if reading many lines

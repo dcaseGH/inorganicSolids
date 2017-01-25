@@ -13,11 +13,34 @@ class TestPlumed(unittest.TestCase):
                                                  Species(element = 'H', cartCoord = np.array([-1., 1., -1.])),
                                                  Species(element = 'H', cartCoord = np.array([-1., -1., 1.]))])
 
-        q6Dict = PlumedInput.q6FromStructure(testStructure,
+        q4Dict = PlumedInput.qlFromStructure(testStructure,
                                              Species(element='C'),
-                                             Species(element='H'), cleanFiles = False)
+                                             Species(element='H'), 
+                                             angMo = 4,
+                                             r_0 = 1.5,
+                                             nn = 4)
 
-        print "CLEAN THE FILES AFTER PLUMED"
+        print q4Dict
+
+        q6Dict = PlumedInput.qlFromStructure(testStructure,
+                                             Species(element='C'),
+                                             Species(element='H'),
+                                             angMo = 6,
+                                             r_0 = 1.5,
+                                             nn = 4)
+
+        print q6Dict
+
+        #test making the table
+
+        np.testing.assert_array_almost_equal( PlumedInput.q4q6Array(testStructure,
+                                                                    Species(element='C'),
+                                                                    Species(element='H'),
+                                                                    r_0 = 1.5,
+                                                                    nn = 4),
+                                              np.array([[0.430907, 0.639292]]))
+
+
 
 if __name__ == '__main__':
     unittest.main()
