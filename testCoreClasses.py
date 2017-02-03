@@ -2,6 +2,13 @@ import unittest
 from coreClasses import *# Structure
 from setTools import *
 
+class TestXYZFiles(unittest.TestCase):
+    def test_basicFunctions(self):
+        self.assertTrue(XYZFile.standardSpeciesLine('Li2 23.4 1.e-10 100.0'))
+        self.assertTrue(XYZFile.standardSpeciesLine('Li2 23.4 1.e-10 100.0\n'))
+        self.assertFalse(XYZFile.standardSpeciesLine('Atoms 3 so there\n'))
+
+
 class TestSymmetryGroup(unittest.TestCase):
     def test_symmetryGroup(self):
         sg = SymmetryGroup.fromCif('testFiles/example.cif')

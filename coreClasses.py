@@ -1,6 +1,166 @@
-#Perhaps make this good if needed
-
+#Core classes to act as interfaces between programs and perform simple manipulations
 import numpy as np
+
+class XYZFile:
+    ''' Some of these may be better being staticmethods and some as instances 
+        Beware of things where there may be lines with a character and then unit cells '''
+    def __init__(self,
+                 fileName          = None,
+                 stringData        = None,
+                 maxStructures     = None, 
+                 linesPerStructure = None):
+
+        self.fileName          = fileName
+        self.stringData        = stringData
+        self.maxStructures     = maxStructures
+        self.linesPerStructure = linesPerStructure
+
+    def setLinesPerStructure(self):
+        ''' The offset will depend on whether there are unit cell vectors etc '''
+        counter = 0
+        header = True
+        for line in open(self.fileName, 'r'):
+            if header and self.standardSpeciesLine(line):
+                header = False
+            elif not header and not self.standardSpeciesLine(line):
+                break
+            counter += 1
+        self.linesPerStructure = counter
+        return self.linesPerStructure
+
+    @staticmethod
+    def standardSpeciesLine(testLine):
+        ''' A standard species line has 4 things [element] [x] [y] [z]
+            The element must begin with a character- the x,y,z are numbers '''
+        splitLine = testLine.split()
+        if len(splitLine) != 4:
+            return False
+        if splitLine[0][0].isalpha() and all([x.replace('.', '', 1).replace('e', '', 1).replace('-', '', 1).replace('E', '', 1).isdigit() for x in splitLine[1:]]):
+            return True
+        return False
+
+    @staticmethod
+    def nStructures(fileName,
+                    linesPerStructure):
+        ''' calculate linesPerStructure manually or with quick subroutine 
+            watch for blank lines '''
+        num_lines = float( sum(1 for line in open(fileName, 'r')) )
+        nStructures = num_lines / float(linesPerStructure)
+        try:
+            assert(nStructures.is_integer())
+        except:
+            raise Exception('Error XYZFile.nStructures')
+        return int(nStructures)
+
+    @staticmethod
+    def returnXYZStrings(fileName,
+                         linesPerStructure,
+                         maxNStructures    = None,
+                         selectList        = None):
+
+        ''' Not fully tested or commented '''
+        counter           = 0
+        yieldCounter      = 0
+        structureCounter  = 0
+        lines   = []
+
+        for line in open(fileName, 'r'):
+
+            counter += 1
+            lines.append(line)
+
+            if len(lines) == linesPerStructure:
+
+                #do not allow blank lines at end of string
+                lines[-1].replace('\n', '')
+                if not selectList or structureCounter in selectList:
+                    yield "".join(lines)
+                    yieldCounter += 1 
+
+                lines = []
+                structureCounter += 1
+
+            # test this!!!! GeneratorExit ???
+            if maxNStructures and yieldCounter >= maxNStructures:
+                raise StopIteration
+
+
+#    @staticmethod
+#    def xyzStringToSpeciesList(xyzString, atomDict, offset):
+#        ''' Clean all this up at some point  '''
+
+
+    ####### THIS IS NOT READY !!!!!!!!!!!!!!!#########
+    @staticmethod
+    def xyzList(self, inFile, returnObjects = 'xyzString'):#, containsUnitCell = True):
+        ''' Read file and break into list of xyzStrings, PMGStructures, or Structures 
+            Either give a string, or dummy instance of either structure type-- do ASE if ever needed'''
+
+        print "XYZ may or may not have unit cell - should work it out automatically"
+        structureList = []
+
+        topBufferLines = 2
+        counter        = 0
+        lines          = []
+        for line in open(historyFileName):
+            counter += 1
+            if counter <= topBufferLines:
+                nAtoms = line.split()[-1]
+                continue
+            exit()
+            timestepBufferLines = int(nAtoms) * 2 + 4
+            lines.append(line)
+
+            if len(lines) == timestepBufferLines:
+
+                # this should just be the quickest thing to break up the file
+                if isInstance(returnObjects, str):
+                    structureList.append("\n".join(lines))
+                    if maxStructures and len(structureList)>= maxStructures:
+                        return structureList
+
+                    lines = []
+                    continue
+
+                latticeVectors = np.array([x.split() for x in lines[1:4]], dtype='float64')
+                species, coords = [], []
+
+                offset = 4
+                for ix, x in enumerate(lines[offset:]):
+                    if ix%2==0:
+
+                        if x == '' or (ignoreShells and 'shl' in x.split()[0]):
+                            continue
+                        elif selectOnlySpecie and x.split()[0].replace('_', '') != selectOnlySpecie:
+                            continue
+                        else:
+                            species.append(x.split()[0].replace('_', ''))
+                            coords.append( np.array(lines[ix+1+offset].split(), dtype='float64') )
+
+                if selectOnlySpecie and addOrigin:
+                    species.append('X')
+                    coords.append(np.zeros(3))
+
+                if isInstance(returnObject, PMGS ):
+                    structureList.append( PMGS(PMGL(latticeVectors),
+                                               species,
+                                               coords,
+                                               coords_are_cartesian = True)
+                                          )
+                elif isInstance(returnObject, Structure):
+                    structureList.append(Structure(unitCell    = UnitCell(vectors = latticeVectors),
+                                                   speciesList = [Species(element   = species[i],
+                                                                          cartCoord = coords[i]) for i in xrange(species)])
+                                         )
+                    
+                if maxStructures and len(structureList)>= maxStructures:
+                    return structureList
+
+                lines = []
+
+        return structureList
+
+
 
 class Species:
 
@@ -143,6 +303,22 @@ class UnitCell:
 
     def setInvVectors(self):
         self.invVectors = np.linalg.inv(self.vectors)
+
+class Potential:
+    ''' At the moment, just a holder '''
+    # no need to __init__ ???
+
+    @staticmethod
+    def adaptRemoveShells(potsIn):
+        ''' Input a list of pots, change VBuckingham species.core -> core  '''
+        from copy import deepcopy
+        outPots = []
+        for x in potsIn:
+            if isinstance(x, VBuckingham):
+                x.species1.core = 'core'
+                x.species2.core = 'core'
+                outPots.append(x)
+        return outPots
 
 class VSpring:
     ''' Assume that spring between species1 core and shel  '''
@@ -617,6 +793,11 @@ class Structure:
         self.speciesList   = getSpeciesListCIF  (cifName)
         self.symmetryGroup = getSymmetryGroupCIF(cifName)
 
+    def toCif(self, cifName):
+        ''' Only write P1 at the moment- quickCif = True '''
+        from cifIO import writeCIF
+        writeCIF(cifName, self, quickCif = True)
+
     def removeListSpecies(self, speciesToMatch, attributes = ['element']):
         ''' Removes a list of matching species from self.speciesList
             Returns this list separately '''
@@ -826,13 +1007,15 @@ class Structure:
                                             [x.fracCoord for x in self.speciesList if x.core[:4] == 'core'])
         return outStructure
 
-    def xyzString(self, includeShells=False, includeCellVectors=False):
+    def xyzString(self, includeShells=False, includeCellVectors=False, reorderAlphabetically=True):
         ''' make .xyz format, for PLUMED for e.g. '''
         import copy
 
         #print a dummy structure with atoms reordered
         newStructure = copy.deepcopy(self)
-        newStructure.speciesList = sorted([x for x in self.speciesList], key = lambda x: x.element)
+        if reorderAlphabetically:
+            print "Reordering species alphabetically in xyzString"
+            newStructure.speciesList = sorted([x for x in self.speciesList], key = lambda x: x.element)
 
         if newStructure.speciesList[0].cartCoord is None:
             newStructure.setCartCoord()

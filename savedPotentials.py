@@ -128,15 +128,37 @@ VBuckingham(species1 = Species(element = 'O', core='shel'),
                                       A        = 715.917969,
                                       rho      = 0.298132,
                                       C6       = 0.)
-                          ]}
-                          
+                          ],
+'tempBVParameters270117':[
+                          VBuckingham(species1 = Species(element = 'O', core='shel'),
+                                      species2 = Species(element = 'O', core='shel'),
+                                      A        = 1.27278724e+04,
+                                      rho      = 2.09829962e-01,
+                                      C6       = 3.21094135e+01),
+                          VBuckingham(species1 = Species(element = 'B'),
+                                      species2 = Species(element = 'O', core='shel'),
+                                      A        = 715.917969,
+                                      rho      = 0.298132,  # old one
+#                                      rho      = 0.25,
+                                      C6       = 0.),
+                          VBuckingham(species1 = Species(element = 'Li'),
+                                      species2 = Species(element = 'O', core='shel'),
+                                      A        = 1.12433747e+03,
+                                      rho      = 2.67185529e-01,
+                                      C6       = 0.),
+                          VBuckingham(species1 = Species(element = 'V'),
+                                      species2 = Species(element = 'O', core='shel'),
+                                      A        = 1.00535801e+03,
+                                      rho      = 3.55733223e-01,
+                                      C6       = 0.)]}
+
 
 
 currentPotentialSet141016 = savedPotentials['lowestLTPSearch'] + savedPotentials['lowestAlTiOSearch']
 currentPotentialSet271016 = savedPotentials['lowestLTPSearch_TiOModified'] + savedPotentials['lowestAlTiOSearch']
 currentPotentialSet311016 = savedPotentials['lowestLTPSearch_TiOModified'] + savedPotentials['lowestAlTiOSearch'] + [savedPotentials['islamLFP'][3]]
 tempBVPotential120117     = currentPotentialSet311016 + savedPotentials['tempBVParameters120117']
-
+tempBVParameters270117    = savedPotentials['tempBVParameters270117']
 
 ''' islamLFP is modification of http://www.rsc.org/suppdata/c5/ta/c5ta09418f/c5ta09418f1.pdf
     lowestLTPSearch is the lowest one in in the Sobol search that passed the negative eigenvalue checks
@@ -145,6 +167,42 @@ tempBVPotential120117     = currentPotentialSet311016 + savedPotentials['tempBVP
     modified TiO -> from script /Users/cmdc2-extra/Work/LATP/defectEnergies/OptimiseTiOParams.py (check details... Phonons (Rutile/anatase) and vacancies) 
     currentPotentialSet311016 is currentPotentialSet271016 + Islams Fe-O '''
 
-
-
-
+finalBVGlassPotential310117 = [
+                               VBuckingham(species1 = Species(element = 'B'),
+                                           species2 = Species(element = 'O', core='shel'),
+                                           A        = 715.917969,
+                                           rho      = 0.298132,
+                                           C6       = 0.),
+                               VBuckingham(species1 = Species(element = 'V'),
+                                           species2 = Species(element = 'O', core='shel'),
+                                           A        = 1.55828588e+03,
+                                           rho      = 3.00825911e-01,
+                                           C6       = 0.),
+                               VBuckingham(species1 = Species(element = 'O', core='shel'),
+                                           species2 = Species(element = 'O', core='shel'),
+                                           A        = 7.15108652e+03,
+                                           rho      = 2.25367531e-01,
+                                           C6       = 2.00509894e+01),
+                               VBuckingham(species1 = Species(element = 'Li'),
+                                           species2 = Species(element = 'O', core='shel'),
+                                           A        = 9.79346646e+02,
+                                           rho      = 2.74825257e-01,
+                                           C6       = 0.),
+                               VBuckingham(species1 = Species(element = 'P'),
+                                           species2 = Species(element = 'O', core='shel'),
+                                           A        = 897.2648,
+                                           rho      = 0.3577,
+                                           C6       = 0.),
+                               VBuckingham(species1 = Species(element = 'Ti'),
+                                           species2 = Species(element = 'O',  core='shel'),
+                                           A        = 6646.426774,
+                                           rho      = 0.243418,
+                                           C6       = 0.0),
+                               VBuckingham(species1 = Species(element = 'Al'),
+                                           species2 = Species(element = 'O',  core='shel'),
+                                           A        = 1761.207581 ,
+                                           rho      = 0.292213 ,
+                                           C6       = 0.0),
+                               VSpring(    species1 = Species(element = 'O'),
+                                           K        = 65.)
+                               ]

@@ -43,6 +43,7 @@ class PlumedInput():
                         neatenFile = True,
                         cleanFiles = True,
                         r_0        = 1.0,
+                        d_0        = None,
                         nn         = None,
                         xyzFile    = 'plumed.xyz',
                         datFile    = 'plumed.dat',
@@ -55,12 +56,13 @@ class PlumedInput():
         from subprocessHandling import RunCommandNew
 
         outDict = {}
-#        print 'assert structure is P1'
-
-        datString = ''
-        # Plumed uses numbers from 1, not 0
-        coordinateIndices = [1 + x for x in structure.speciesMatchIndices(targetSpecies = coordinateSpecies)]
-        centralIndices    = [1 + x for x in structure.speciesMatchIndices(targetSpecies = centralSpecies)]
+        # Plumed uses numbers from 1, not 0, and we only want core species
+        assert(centralSpecies.core.lower()[0]    == 'c')
+        assert(coordinateSpecies.core.lower()[0] == 'c')
+        coordinateIndices = [1 + x for x in structure.speciesMatchIndices(targetSpecies = coordinateSpecies,
+                                                                          matchAttributes = ['element', 'core'])]
+        centralIndices    = [1 + x for x in structure.speciesMatchIndices(targetSpecies = centralSpecies,
+                                                                          matchAttributes = ['element', 'core'])]
 
         if neatenFile:
             from hardcode import groupIntegers
@@ -69,22 +71,30 @@ class PlumedInput():
             coordString = ','.join(map(str, coordinateIndices))
 
         labelPrefix = "q%s_" % angMo
+        lineString = ''
         for c in centralIndices:
+            lineString +=  "Q%s SPECIESA=%s SPECIESB=%s" %(angMo, c, coordString)
+            if r_0 is not None:
+                lineString += " R_0=%s"%r_0
+            if d_0 is not None:
+                lineString += " D_0=%s"%d_0
             if nn is not None:
-                datString += "Q%s SPECIESA=%s SPECIESB=%s R_0=%s NN=%s MEAN LABEL=%s\n" %(angMo, c, coordString, r_0, nn, labelPrefix + str(c))
-            else:
-                datString += "Q%s SPECIESA=%s SPECIESB=%s R_0=%s MEAN LABEL=%s\n" %(angMo, c, coordString, r_0, labelPrefix + str(c))
+                lineString += " NN=%s"%nn
+            lineString += " MEAN LABEL=%s\n" %(labelPrefix + str(c))
+        datString = lineString
+
 
         datString += 'PRINT ARG=' + ','.join([labelPrefix+str(c)+'.mean' for c in centralIndices]) + " FILE=%s\n" % colvarFile
 
         with open(xyzFile, 'w') as outf:
-            outf.write(structure.xyzString(includeCellVectors=True))
+            outf.write(structure.xyzString(includeCellVectors=True, reorderAlphabetically=False))
 
         with open(datFile, 'w') as outf:
             outf.write(datString)
         
         runner = RunCommandNew(PLUMED_EXE + " driver --plumed %s  --ixyz %s"%(datFile, xyzFile))
         runner.run(timeout=100.)
+#        print runner.output
 
         with open(colvarFile, 'r') as inFile:            
             #change this if reading many lines
@@ -95,23 +105,13 @@ class PlumedInput():
             assert(len(keyLine) == len(datLine))
             for i in xrange(len(keyLine)):
                 outDict[keyLine[i]] = float(datLine[i])
-#        print runner.output
 
         #remove files (from the current directory)
-#        for f in [datFile, xyzFile]:
         for f in [datFile, xyzFile, colvarFile]:
             if cleanFiles and os.path.exists(f):
                 os.remove(f)
 
         return outDict
-
-#    @staticmethod
-#    def xyzFromCif(cif):
-#        ''' One cif -> xyz with appropriate dressing '''
-#        pass
-
-    
-
 
 if __name__ == "__main__":
     import argparse
