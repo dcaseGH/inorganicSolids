@@ -550,6 +550,15 @@ class DLPOLYHistory():
         writeCIF(outCifFileName, baseStructure)
 
     @staticmethod
+    def makeUnitCell(historyFileName, maxStructures = 1):
+        ''' Top two lines have a title and also the number of atoms 
+            Only use for NVT so just take first structure '''
+
+        from coreClasses import UnitCell
+        structures = DLPOLYHistory.makePMGStructureList(historyFileName, maxStructures = maxStructures)
+        return UnitCell(vectors = structures[0]._lattice._matrix)
+
+    @staticmethod
 #    def makeListPositions(historyFileName, kwargs):
     def makeListPositions(historyFileName, selectOnlySpecie = False, ignoreShells = True, maxStructures = None,
                           fracCoord = True, cartCoord = False, addOrigin = True):

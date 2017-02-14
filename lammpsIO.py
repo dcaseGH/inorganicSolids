@@ -264,6 +264,30 @@ class LAMMPSOutput():
                          speciesList = atomList)
 
     @staticmethod
+    def structureGeneratorFromXYZandLog(xyzFileName, logFile, speciesDict = None, selectList = None):
+        ''' Yield structures as required  from xyz (trajectory) and maybe logfile too
+            ONLY WORKS FOR ORTHORHOMBIC CELLS '''
+        from coreClasses import XYZFile, Structure, UnitCell
+        logDict = LAMMPSOutput.logDataToDict(logFile)
+        trajXYZ = XYZFile(fileName = xyzFileName)
+        linesPerStructure = trajXYZ.setLinesPerStructure()
+
+        for ixyz, xyz in XYZFile.returnXYZStrings(trajXYZ.fileName,
+                                                  trajXYZ.linesPerStructure,
+#                                                  maxNStructures = 1,
+                                                  selectList  = selectList,
+                                                  returnIndex = True):
+
+            speciesList = XYZFile.xyzStringToSpeciesList(xyz, speciesDict = speciesDict)
+            unitCell    = UnitCell(vectors = np.diag(map(float, [logDict['Lx'][ixyz],
+                                                                 logDict['Ly'][ixyz],
+                                                                 logDict['Lz'][ixyz]])))
+
+            yield Structure(speciesList = speciesList,
+                            unitCell    = unitCell)
+
+
+    @staticmethod
     def logDataToDict(dataFile, cleanLogFirst=True):
         ''' If log file is cleaned beforehand, no need to cut out the useful bit '''
         with open(dataFile, 'r') as inFile:
