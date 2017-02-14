@@ -324,6 +324,21 @@ class UnitCell:
     def setInvVectors(self):
         self.invVectors = np.linalg.inv(self.vectors)
 
+    def createGrid(self, targetSeparation = 1., includeExtraPoint = True):
+        ''' Return a grid with roughly targetSeparation along axes (use meshgrid for certain things) '''
+
+        if includeExtraPoint:
+            extraPt = 1
+        else:
+            extraPt = 0
+
+        nPts = np.floor(self.lengths / targetSeparation)
+        nPtsI = np.array(np.floor(self.lengths / targetSeparation), dtype=int)
+
+        return np.dot([(i,j,k)/nPts for i in xrange(nPtsI[0] + extraPt)
+                                    for j in xrange(nPtsI[1] + extraPt)
+                                    for k in xrange(nPtsI[2] + extraPt)], self.vectors)
+
 class Potential:
     ''' At the moment, just a holder '''
     # no need to __init__ ???

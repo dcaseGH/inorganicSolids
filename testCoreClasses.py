@@ -139,6 +139,10 @@ class TestStructureMethods(unittest.TestCase):
                                                        [ 0.53048842,  1.310947,    1.41421356],
                                                        [ 0.,          0.,          3.        ]]))
 
+        grid = u.createGrid()
+        self.assertTrue(grid.shape == (24,3))
+        np.testing.assert_array_almost_equal(grid[-1,:], np.dot([1,1,1], u.vectors))
+
     def test_numberValenceElectrons(self):
         from dlpolyIO import dlpolyInput
         s = dlpolyInput.initFromCONFIG('testFiles/exampleCONFIG').parentStructure
