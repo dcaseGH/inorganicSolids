@@ -13,16 +13,17 @@ class PlumedInput():
         pass
 
     @staticmethod
-#    def q4q6Array(structure,
-#                  centralSpecies,
-#                  coordinateSpecies,
-#                  kwargs):
     def q4q6Array(*args,
                   **kwargs):
-#                  r_0 = 1.0,
-#                  d_0 = 0.):
+
         ''' Make table of (q4, q6) 
-            Maintain order so that points can be identified within structure '''
+            Maintain order so that points can be identified within structure 
+            Can add third column of coordinationNumber if =True in kwargs '''
+
+        calcCoordinationNumber = False
+        if 'coordinationNumber' in kwargs.keys() and kwargs['coordinationNumber']:
+            del(kwargs['coordinationNumber'])
+            calcCoordinationNumber = True
 
         kwargs['angMo'] = 4
         q4Dict = PlumedInput.qlFromStructure(*args, **kwargs)
@@ -31,6 +32,13 @@ class PlumedInput():
         q6Dict = PlumedInput.qlFromStructure(*args, **kwargs)
 
         orderedKeys = sorted( map(int, ([x.replace('.mean', '').replace('q6_', '') for x in q6Dict.keys()])) )
+
+        if calcCoordinationNumber:
+            kwargs['angMo'] = 0
+            q0Dict = PlumedInput.qlFromStructure(*args, **kwargs)
+            return np.array([[q4Dict['q4_' + i + '.mean'],
+                              q6Dict['q6_' + i + '.mean'],
+                              q0Dict['q0_' + i + '.mean']] for i in map(str, orderedKeys)])
 
         return np.array([[q4Dict['q4_' + i + '.mean'], q6Dict['q6_' + i + '.mean']] for i in map(str, orderedKeys)])
 
@@ -45,6 +53,8 @@ class PlumedInput():
                         r_0        = 1.0,
                         d_0        = None,
                         nn         = None,
+                        mm         = None,
+#                        coordinationNumber = False,
                         xyzFile    = 'plumed.xyz',
                         datFile    = 'plumed.dat',
                         colvarFile = 'COLVAR'):
@@ -59,6 +69,7 @@ class PlumedInput():
         # Plumed uses numbers from 1, not 0, and we only want core species
         assert(centralSpecies.core.lower()[0]    == 'c')
         assert(coordinateSpecies.core.lower()[0] == 'c')
+#        assert(coordinationNumber == False or angMo == 0)
         coordinateIndices = [1 + x for x in structure.speciesMatchIndices(targetSpecies = coordinateSpecies,
                                                                           matchAttributes = ['element', 'core'])]
         centralIndices    = [1 + x for x in structure.speciesMatchIndices(targetSpecies = centralSpecies,
@@ -80,8 +91,12 @@ class PlumedInput():
                 lineString += " D_0=%s"%d_0
             if nn is not None:
                 lineString += " NN=%s"%nn
+            if mm is not None:
+                lineString += " MM=%s"%mm
             lineString += " MEAN LABEL=%s\n" %(labelPrefix + str(c))
-        datString = lineString
+
+        # Q0 is assumed to be COORDINATION NUMBER and called as such
+        datString = lineString.replace('Q0', 'COORDINATIONNUMBER')
 
 
         datString += 'PRINT ARG=' + ','.join([labelPrefix+str(c)+'.mean' for c in centralIndices]) + " FILE=%s\n" % colvarFile

@@ -41,6 +41,14 @@ class TestPlumed(unittest.TestCase):
                                               np.array([[0.430907, 0.639292]]))
 
 
+        # increase the r0 to have all four H atoms in COORDINATIONNUMBER
+        self.assertTrue( abs(PlumedInput.qlFromStructure(testStructure,
+                                                         Species(element='C'),
+                                                         Species(element='H'),
+                                                         angMo = 0,
+                                                         r_0 = 10.5,
+                                                         nn = 6)['q0_1.mean'] - 4.) < 0.001)
+
 
 if __name__ == '__main__':
     unittest.main()

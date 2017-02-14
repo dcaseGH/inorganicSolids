@@ -9,6 +9,7 @@ class XYZFile:
                  stringData        = None,
                  maxStructures     = None, 
                  linesPerStructure = None):
+#                 nStructures       = None):
 
         self.fileName          = fileName
         self.stringData        = stringData
@@ -35,6 +36,7 @@ class XYZFile:
         splitLine = testLine.split()
         if len(splitLine) != 4:
             return False
+        # Deal with cases where atom has a numerical index at another time
         if splitLine[0][0].isalpha() and all([x.replace('.', '', 1).replace('e', '', 1).replace('-', '', 1).replace('E', '', 1).isdigit() for x in splitLine[1:]]):
             return True
         return False
@@ -56,7 +58,8 @@ class XYZFile:
     def returnXYZStrings(fileName,
                          linesPerStructure,
                          maxNStructures    = None,
-                         selectList        = None):
+                         selectList        = None,
+                         returnIndex       = False):
 
         ''' Not fully tested or commented '''
         counter           = 0
@@ -74,7 +77,10 @@ class XYZFile:
                 #do not allow blank lines at end of string
                 lines[-1].replace('\n', '')
                 if not selectList or structureCounter in selectList:
-                    yield "".join(lines)
+                    if returnIndex:
+                        yield (yieldCounter, "".join(lines))
+                    else:
+                        yield "".join(lines)
                     yieldCounter += 1 
 
                 lines = []
@@ -85,10 +91,24 @@ class XYZFile:
                 raise StopIteration
 
 
-#    @staticmethod
-#    def xyzStringToSpeciesList(xyzString, atomDict, offset):
-#        ''' Clean all this up at some point  '''
-
+    @staticmethod
+    def xyzStringToSpeciesList(xyzString, speciesDict=None, offset = 0):
+        ''' Clean all this up at some point 
+            Atom Dict is in case of labelling atoms 1,2,3 not Fe, S, O etc - also can add other info if with in the atomDict 
+            atm the species dict should have str for keys '''
+        from copy import deepcopy
+        speciesList = []
+        for l in xyzString.split("\n")[offset:]:
+            if XYZFile.standardSpeciesLine(l):
+                if speciesDict:
+#                    tempAtom = deepcopy(speciesDict[int(l.split()[0])])
+                    tempAtom = deepcopy(speciesDict[l.split()[0]])
+                    tempAtom.cartCoord = np.array(l.split()[1:], dtype='float64')
+                else:
+                    tempAtom = Species(element   = l.split()[0],
+                                       cartCoord = np.array(l.split()[1:], dtype='float64') )
+                speciesList.append(tempAtom)
+        return speciesList
 
     ####### THIS IS NOT READY !!!!!!!!!!!!!!!#########
     @staticmethod
@@ -766,6 +786,11 @@ class Structure:
         return cls(unitCell    = UnitCell(vectors = pmgStructure._lattice._matrix),
                    speciesList = [Species().initFromPMGSite(x) for x in pmgStructure._sites])
 
+#    @classmethod
+#    def fromXYZ(cls,  unitCell=None):
+#        return cls(unitCell    = unitCell,
+#                   speciesList = speciesList)
+
     @classmethod
     def fromCIF(cls, cifName, expandFullCell = False):
         ''' cifName is just the name of the file (inc. location if different directory)
@@ -940,6 +965,10 @@ class Structure:
             targetSpecies is optional, and only the element is used at this stage 
             if returnVectors these are cartesian vectors 
             if returnSpeciesList this is a list of Species, with positions WRT central atom '''
+
+        # ensure that fractional coordinates are available
+        if self.speciesList[0].fracCoord is None:
+            self.setFracCoord()
 
         # cutoffRadius is for looking for neighbours- 4. is only really appropriate for close things
         if not cutoffRadius:
