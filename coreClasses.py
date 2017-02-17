@@ -324,8 +324,10 @@ class UnitCell:
     def setInvVectors(self):
         self.invVectors = np.linalg.inv(self.vectors)
 
-    def createGrid(self, targetSeparation = 1., includeExtraPoint = True):
-        ''' Return a grid with roughly targetSeparation along axes (use meshgrid for certain things) '''
+    def createGrid(self, targetSeparation = 1., includeExtraPoint = True, returnMGrid = False):
+        ''' Return a grid with roughly targetSeparation along axes (use meshgrid for certain things) 
+            Normal use is (Npts,3) numpy array
+            Alternatively, return 3 (nx,ny,nz) arrays- see mgrid vectorization '''
 
         if includeExtraPoint:
             extraPt = 1
@@ -334,6 +336,17 @@ class UnitCell:
 
         nPts = np.floor(self.lengths / targetSeparation)
         nPtsI = np.array(np.floor(self.lengths / targetSeparation), dtype=int)
+
+        if returnMGrid:
+            print 'not implemented yet';exit()
+            if includeExtraPoint:
+                return np.mgrid[0:1:nPtsI[0]*1j,
+                                0:1:nPtsI[1]*1j,
+                                0:1:nPtsI[2]*1j]
+            #mgrid must be orthogonal??
+#                return [np.dot(x, self.vectors) for x in np.mgrid[0:1:nPtsI[0]*1j,
+#                                                                  0:1:nPtsI[1]*1j,
+#                                                                  0:1:nPtsI[2]*1j]]
 
         return np.dot([(i,j,k)/nPts for i in xrange(nPtsI[0] + extraPt)
                                     for j in xrange(nPtsI[1] + extraPt)
@@ -813,8 +826,13 @@ class Structure:
             N.B. two methods dont give same order, and no cartCoords from default method '''
 
         if expandFullCell:
-            from pymatgen.core import Structure as PMGS
-            return cls.fromPMGStructure(PMGS.from_file(cifName))
+            try:
+                from pymatgen.core import Structure as PMGS
+                return cls.fromPMGStructure(PMGS.from_file(cifName))
+            except ValueError:
+                print 'Failure for pymatgen - try using ASE'
+                from ase.io import read as ASERead
+                return cls.fromASEStructure(aseStructure = ASERead(cifName))
 
         from cifIO import getUnitCellCIF, getSpeciesListCIF, getSymmetryGroupCIF
         try:

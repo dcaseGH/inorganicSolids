@@ -568,12 +568,20 @@ class DLPOLYHistory():
 #        structures = DLPOLYHistory.makePMGStructureList(historyFileName, **kwargs)
         structures = DLPOLYHistory.makePMGStructureList(historyFileName, selectOnlySpecie = selectOnlySpecie, ignoreShells = ignoreShells, maxStructures = maxStructures)
 
+        # specify either, but one or t'other
+        fracCoord = not cartCoord
+
         # do I want fractional coords ???
         if fracCoord:
             return np.array([x._fcoords for y in structures for x in y._sites])
         elif cartCoord:
             return np.array([x._coords for y in structures for x in y._sites])
 
+    @staticmethod
+    def makeStructureList(*vars, **kwargs):
+        ''' Wrapper to make a list of my structure class, not PMG '''
+        from coreClasses import Structure
+        return [Structure.fromPMGStructure(x) for x in DLPOLYHistory.makePMGStructureList(*vars, **kwargs)]
 
     @staticmethod
     def makePMGStructureList(historyFileName, selectOnlySpecie = False, ignoreShells = True, maxStructures = None, addOrigin = True):
