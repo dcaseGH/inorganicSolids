@@ -92,6 +92,16 @@ class XYZFile:
 
 
     @staticmethod
+    def xyzStringToCellVectors(xyzString):
+        ''' Cell info on second line-- assume orthorhombic for now- easy to add if need  '''
+        cellInfo = xyzString.split("\n")[1].split()
+
+        #change this if need to go beyond orthorhombic - assume second line is only this cell info
+        assert(len(cellInfo) == 3)
+        return np.diag(map(float, cellInfo))
+
+
+    @staticmethod
     def xyzStringToSpeciesList(xyzString, speciesDict=None, offset = 0):
         ''' Clean all this up at some point 
             Atom Dict is in case of labelling atoms 1,2,3 not Fe, S, O etc - also can add other info if with in the atomDict 
@@ -351,6 +361,11 @@ class UnitCell:
         return np.dot([(i,j,k)/nPts for i in xrange(nPtsI[0] + extraPt)
                                     for j in xrange(nPtsI[1] + extraPt)
                                     for k in xrange(nPtsI[2] + extraPt)], self.vectors)
+
+    @classmethod
+    def fromXYZFile(cls, xyzFile):
+        return cls(vectors = XYZFile.xyzStringToCellVectors(open(xyzFile.fileName, 'r').read()))
+
 
 class Potential:
     ''' At the moment, just a holder '''
@@ -814,10 +829,17 @@ class Structure:
         return cls(unitCell    = UnitCell(vectors = pmgStructure._lattice._matrix),
                    speciesList = [Species().initFromPMGSite(x) for x in pmgStructure._sites])
 
-#    @classmethod
-#    def fromXYZ(cls,  unitCell=None):
-#        return cls(unitCell    = unitCell,
-#                   speciesList = speciesList)
+    @classmethod
+    def fromXYZ(cls, xyzFileName, unitCell=None):
+        xyzF = XYZFile(fileName = xyzFileName)
+
+        if not unitCell:
+            unitCell = UnitCell.fromXYZFile(xyzF)
+
+        speciesList = XYZFile.xyzStringToSpeciesList(open(xyzF.fileName, 'r').read())
+
+        return cls(unitCell    = unitCell,
+                   speciesList = speciesList)
 
     @classmethod
     def fromCIF(cls, cifName, expandFullCell = False):

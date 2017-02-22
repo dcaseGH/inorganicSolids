@@ -214,6 +214,13 @@ class TestStructureMethods(unittest.TestCase):
                              x.fracCoord[1] >= newLimits[1, 0] and x.fracCoord[1] < newLimits[1, 1] and 
                              x.fracCoord[2] >= newLimits[2, 0] and x.fracCoord[2] < newLimits[2, 1] for x in structure.speciesList]))
 
+    def test_fromXYZ(self):
+        from coreClasses import Structure
+        structure = Structure.fromXYZ('testFiles/example.xyz')
+
+        self.assertTrue(len(structure.speciesList) == 4999)
+        np.testing.assert_array_almost_equal(structure.unitCell.lengths,
+                                             np.array([40.431938,    39.603764,    43.959198]))
 
 class TestSpeciesMethods(unittest.TestCase):
 
