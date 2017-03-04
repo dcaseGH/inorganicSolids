@@ -218,6 +218,10 @@ class Species:
         self.cartVelocity   = cartVelocity
         self.cartForce      = cartForce
 
+    def toASEAtom(self):
+        from ase import Atom
+        return Atom(self.element, self.cartCoord)
+
     @classmethod
     def initFromASEAtom(cls, aseAtom):
         return cls(cartCoord = aseAtom.position, 
@@ -334,7 +338,7 @@ class UnitCell:
     def setInvVectors(self):
         self.invVectors = np.linalg.inv(self.vectors)
 
-    def createGrid(self, targetSeparation = 1., includeExtraPoint = True, returnMGrid = False):
+    def createGrid(self, targetSeparation = 1., includeExtraPoint = True, returnMGrid = False, returnInfo = False, columnMajor = False):
         ''' Return a grid with roughly targetSeparation along axes (use meshgrid for certain things) 
             Normal use is (Npts,3) numpy array
             Alternatively, return 3 (nx,ny,nz) arrays- see mgrid vectorization '''
@@ -358,9 +362,25 @@ class UnitCell:
 #                                                                  0:1:nPtsI[1]*1j,
 #                                                                  0:1:nPtsI[2]*1j]]
 
-        return np.dot([(i,j,k)/nPts for i in xrange(nPtsI[0] + extraPt)
-                                    for j in xrange(nPtsI[1] + extraPt)
-                                    for k in xrange(nPtsI[2] + extraPt)], self.vectors)
+        #delete this
+        if returnInfo:
+            print "Grid = (%s, %s, %s)"%(nPtsI[0] + extraPt,
+                                         nPtsI[1] + extraPt,
+                                         nPtsI[2] + extraPt)
+
+        if columnMajor:
+            outpoints = np.dot([(i,j,k)/nPts for k in xrange(nPtsI[2] + extraPt)
+                                             for j in xrange(nPtsI[1] + extraPt)
+                                             for i in xrange(nPtsI[0] + extraPt)], self.vectors)
+        else:
+            outpoints = np.dot([(i,j,k)/nPts for i in xrange(nPtsI[0] + extraPt)
+                                             for j in xrange(nPtsI[1] + extraPt)
+                                             for k in xrange(nPtsI[2] + extraPt)], self.vectors)
+           
+        if returnInfo:
+            return (nPtsI + np.array([extraPt, extraPt, extraPt]), outpoints)
+
+        return outpoints
 
     @classmethod
     def fromXYZFile(cls, xyzFile):
@@ -679,6 +699,7 @@ class Structure:
         self.speciesList = newSpeciesList
         # catch errors hopefully with this
         self.unitCell    = None
+        return self
 
     def uniqueSpecies(self, attrList):
         ''' Return list, worry about changes if need be'''
@@ -803,7 +824,20 @@ class Structure:
 # 
 #        raise Exception('Better to just read a cif with PMG or ASE for now')
 
+    @classmethod
+    def superCell(self, superCell):
+        ''' returns a superCell - input (1,1,1) for eg (tuple of ints (fracs??))'''
+        return Structure.fromASEStructure( self.toASEStructure * superCell )
 
+    def toASEStructure(self):
+        from ase import Atoms
+
+        if self.speciesList[0].cartCoord is None:
+            self.setCartCoord()
+
+        return Atoms([x.toASEAtom() for x in self.speciesList],
+                     cell = self.unitCell.vectors)
+        
     @classmethod
     def fromASEStructure(cls, aseStructure):
         ''' Reading in an ASE structure can help make supercells
@@ -1022,7 +1056,8 @@ class Structure:
             if returnSpeciesList this is a list of Species, with positions WRT central atom '''
 
         # ensure that fractional coordinates are available
-        if self.speciesList[0].fracCoord is None:
+#        if self.speciesList[0].fracCoord is None:
+        if any(x.fracCoord is None for x in self.speciesList):
             self.setFracCoord()
 
         # cutoffRadius is for looking for neighbours- 4. is only really appropriate for close things
@@ -1030,7 +1065,7 @@ class Structure:
             cutoffRadius = 4.
 
         # start by temporarily making a PMG structure- use this functionality and watch fracCoord bounds
-        centralFracCoord = self.speciesList[speciesListIndex].fracCoord - np.floor(self.speciesList[speciesListIndex].fracCoord)
+        centralFracCoord = np.mod(self.speciesList[speciesListIndex].fracCoord, 1)
         tempPMGStructure = self.makePMGStructure() 
         centralSite = [s for s in tempPMGStructure._sites if np.allclose(s._fcoords, centralFracCoord, atol=1.e-6)][0]
 

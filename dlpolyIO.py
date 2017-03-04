@@ -560,13 +560,25 @@ class DLPOLYHistory():
 
     @staticmethod
 #    def makeListPositions(historyFileName, kwargs):
-    def makeListPositions(historyFileName, selectOnlySpecie = False, ignoreShells = True, maxStructures = None,
-                          fracCoord = True, cartCoord = False, addOrigin = True):
+    def makeListPositions(historyFileName, 
+                          selectOnlySpecie = False,
+                          ignoreShells     = True,
+                          maxStructures    = None,
+                          fracCoord        = True,
+                          cartCoord        = False,
+                          addOrigin        = True,
+                          correctForDrift  = False,
+                          reshapeOutput    = False):
+
         ''' Top two lines have a title and also the number of atoms 
             Adding a dummy atom at the origin is essential for pmg diffusion analysis '''
 
 #        structures = DLPOLYHistory.makePMGStructureList(historyFileName, **kwargs)
-        structures = DLPOLYHistory.makePMGStructureList(historyFileName, selectOnlySpecie = selectOnlySpecie, ignoreShells = ignoreShells, maxStructures = maxStructures)
+        structures = DLPOLYHistory.makePMGStructureList(historyFileName, 
+                                                        selectOnlySpecie = selectOnlySpecie, 
+                                                        ignoreShells     = ignoreShells, 
+                                                        maxStructures    = maxStructures,
+                                                        correctForDrift  = correctForDrift)
 
         # specify either, but one or t'other
         fracCoord = not cartCoord
@@ -575,6 +587,9 @@ class DLPOLYHistory():
         if fracCoord:
             return np.array([x._fcoords for y in structures for x in y._sites])
         elif cartCoord:
+            if reshapeOutput:
+                nStructures, nSites = len(structures), len(structures[0]._sites)
+                return np.array([x._coords for y in structures for x in y._sites]).reshape((nStructures, nSites, 3))
             return np.array([x._coords for y in structures for x in y._sites])
 
     @staticmethod
@@ -584,7 +599,13 @@ class DLPOLYHistory():
         return [Structure.fromPMGStructure(x) for x in DLPOLYHistory.makePMGStructureList(*vars, **kwargs)]
 
     @staticmethod
-    def makePMGStructureList(historyFileName, selectOnlySpecie = False, ignoreShells = True, maxStructures = None, addOrigin = True):
+    def makePMGStructureList(historyFileName, 
+                             selectOnlySpecie = False, 
+                             ignoreShells     = True,
+                             maxStructures    = None,
+                             addOrigin        = True,
+                             correctForDrift  = False):
+
         ''' reads historyFileName and returns a list of PMG structures
             put initial structure index in if needed '''
         from pymatgen.core.lattice   import Lattice   as PMGL
@@ -597,6 +618,8 @@ class DLPOLYHistory():
         topBufferLines = 2
         counter        = 0
         lines          = []
+        originalCentroid  = None
+
         for line in open(historyFileName):
             counter += 1
             if counter <= topBufferLines:
@@ -607,22 +630,13 @@ class DLPOLYHistory():
             lines.append(line)
 
             if len(lines) == timestepBufferLines:
-#            if (counter - topBufferLines)% timestepBufferLines == 0:
-#        counter = 0
-
-#        while True:
-#            counter = 0
-#            lines   = []
-
-
-#        with open(historyFileName, 'r') as inFile:
-#            for timestep in inFile.read().split('timestep')[1:]:
-#                lines = timestep.split('\n')
 
                 # note- possibly the lattice is written to terrible accuracy-- why would dlpoly do this????
                 lattice = PMGL( np.array([x.split() for x in lines[1:4]], dtype='float64') )
 
                 species, coords = [], []
+                if correctForDrift:
+                    additionalCoords = []
 
                 offset = 4
                 for ix, x in enumerate(lines[offset:]):
@@ -630,6 +644,8 @@ class DLPOLYHistory():
 
                         if x == '' or (ignoreShells and 'shl' in x.split()[0]):
                             continue
+                        elif correctForDrift and selectOnlySpecie and x.split()[0].replace('_', '') != selectOnlySpecie:
+                            additionalCoords.append(np.array(lines[ix+1+offset].split(), dtype='float64'))
                         elif selectOnlySpecie and x.split()[0].replace('_', '') != selectOnlySpecie:
                             continue
                         else:
@@ -639,6 +655,12 @@ class DLPOLYHistory():
                 if selectOnlySpecie and addOrigin:
                     species.append('X')
                     coords.append(np.zeros(3))
+
+                if correctForDrift:
+                    currentCentroid = np.mean(np.array(additionalCoords), axis = 0)
+                    if originalCentroid is None:
+                        originalCentroid = currentCentroid
+                    coords -= currentCentroid - originalCentroid
 
                 structureList.append( PMGS(lattice,
                                            species,

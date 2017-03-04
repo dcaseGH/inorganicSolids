@@ -66,7 +66,7 @@ class coreObjectPlotting():
             self.structure.setCartCoord()
         
         for s in self.structure.speciesList:
-            print "plotting", s.cartCoord
+#            print "plotting", s.cartCoord
             mlab.points3d(s.cartCoord[0],s.cartCoord[1],s.cartCoord[2],
                           color        = defaultAtomObjects[s.element].color,
                           scale_factor = defaultAtomObjects[s.element].scale_factor)
@@ -94,7 +94,7 @@ class coreObjectPlotting():
         if 'cutoffRadius' not in kwargs.keys():
             kwargs['cutoffRadius'] = 2.
 
-        print kwargs['centralSpecies']
+#        print kwargs['centralSpecies']
         for c in kwargs['centralSpecies']:
             for s in self.structure.speciesMatchIndices(targetSpecies   = c,
                                                         matchAttributes = ['element', 'core']):
