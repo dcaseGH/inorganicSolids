@@ -386,6 +386,15 @@ class UnitCell:
     def fromXYZFile(cls, xyzFile):
         return cls(vectors = XYZFile.xyzStringToCellVectors(open(xyzFile.fileName, 'r').read()))
 
+    def vertices(self, fractional = True):
+        ''' vertices of the unit cell - property?? '''
+
+        fracVertices = np.array([(i,j,k) for i in xrange(2) for j in xrange(2) for k in xrange(2)])
+
+        if not fractional:
+            return np.dot(fracVertices, self.vectors)
+        else:
+            return fracVertices
 
 class Potential:
     ''' At the moment, just a holder '''
@@ -645,6 +654,23 @@ class Structure:
         self.speciesList   = speciesList
         self.symmetryGroup = symmetryGroup
 
+    def cartCoords(self):
+        ''' List of cart coords - remove shells later if needed'''
+
+        if self.speciesList[0].cartCoord is None:
+            self.setCartCoord()
+
+        return np.array([x.cartCoord for x in self.speciesList])
+
+    def fracCoords(self):
+        ''' List of frac coords - remove shells later if needed'''
+
+        if self.speciesList[0].fracCoord is None:
+            self.setFracCoord()
+
+        return np.array([x.fracCoord for x in self.speciesList])
+
+
     @classmethod
     def subSection(cls, parentStructure, limits):
         ''' Returns new structure which is cut-out
@@ -733,7 +759,8 @@ class Structure:
             self.speciesList[i].fracCoord -= np.floor(self.speciesList[i].fracCoord)
 
         # if there are cart coords, reset these too
-        if self.speciesList[0].cartCoord is not None:
+#        if self.speciesList[0].cartCoord is not None: Untested Change 150317
+        if self.speciesList[0].cartCoord is None:
             self.setCartCoord()            
         print "Please set good tests for all these- consider different programs and their conventions"
 

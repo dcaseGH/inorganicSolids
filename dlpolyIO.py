@@ -677,7 +677,9 @@ class DLPOLYHistory():
 
     @staticmethod
     def initPMGDiffusionAnalyzer(*args, **kwargs):
-        ''' Add controls here, e.g. put in a wrapper with specie selection  '''
+        ''' Add controls here, e.g. put in a wrapper with specie selection 
+            PyMatGen wants things in Angstroms and femtoseconds '''
+
         from pymatgen.analysis.diffusion_analyzer import DiffusionAnalyzer
 
         if 'smoothed' not in kwargs.keys():

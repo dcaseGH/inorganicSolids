@@ -214,6 +214,16 @@ class TestStructureMethods(unittest.TestCase):
                              x.fracCoord[1] >= newLimits[1, 0] and x.fracCoord[1] < newLimits[1, 1] and 
                              x.fracCoord[2] >= newLimits[2, 0] and x.fracCoord[2] < newLimits[2, 1] for x in structure.speciesList]))
 
+    def test_unitCellVertices(self):
+        from coreClasses import UnitCell
+
+        uc = UnitCell(vectors = np.diag([2,3,4]))
+        self.assertTrue(uc.vertices().shape[0] == 8)
+        np.testing.assert_array_almost_equal(np.max(uc.vertices(), axis=0),
+                                             np.ones(3))
+        np.testing.assert_array_almost_equal(np.max(uc.vertices(fractional=False), axis=0),
+                                             np.array([2,3,4]))
+
     def test_fromXYZ(self):
         from coreClasses import Structure
         structure = Structure.fromXYZ('testFiles/example.xyz')
