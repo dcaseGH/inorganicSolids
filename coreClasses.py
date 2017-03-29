@@ -16,6 +16,22 @@ class XYZFile:
         self.maxStructures     = maxStructures
         self.linesPerStructure = linesPerStructure
 
+    @staticmethod
+    def returnString(inString, swapDict = {}):
+        ''' Quick way to rewrite files with dummy labels (use swapDict) '''
+        outLines = []
+        for line in inString.split("\n"):
+            if len(line) == 0:
+                continue
+            splitLine = line.split()
+
+            if splitLine[0] in swapDict.keys():
+                splitLine[0] = swapDict[splitLine[0]]
+
+            outLines.append(" ".join(splitLine))
+        return "\n".join(outLines)
+
+
     def setLinesPerStructure(self):
         ''' The offset will depend on whether there are unit cell vectors etc '''
         counter = 0
@@ -67,6 +83,10 @@ class XYZFile:
         structureCounter  = 0
         lines   = []
 
+        # define max structures if selectList to make this quicker
+        if maxNStructures is None and selectList is not None:
+            maxNStructures = len(selectList)
+
         for line in open(fileName, 'r'):
 
             counter += 1
@@ -97,9 +117,12 @@ class XYZFile:
         cellInfo = xyzString.split("\n")[1].split()
 
         #change this if need to go beyond orthorhombic - assume second line is only this cell info
-        assert(len(cellInfo) == 3)
-        return np.diag(map(float, cellInfo))
-
+#        assert(len(cellInfo) == 3)
+        if len(cellInfo) == 3:
+            return np.diag(map(float, cellInfo))
+        elif len(cellInfo) == 6:
+            print 'warning, better to calculate angles etc and turn to cell'
+            return np.array(map(float, [cellInfo[0], cellInfo[3], cellInfo[4], 0., cellInfo[1], cellInfo[5], 0., 0., cellInfo[2]])).reshape((3,3))
 
     @staticmethod
     def xyzStringToSpeciesList(xyzString, speciesDict=None, offset = 0):
@@ -623,9 +646,9 @@ class SymmetryGroup:
         from pymatgen.core import Structure as PMGS
         from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
         analyzer = SpacegroupAnalyzer(PMGS.from_file(fileName))
-        return cls(labelHM     = analyzer.get_spacegroup_symbol(),
-                   number      = analyzer.get_spacegroup_number(),
-                   elementList = analyzer.get_spacegroup())
+        return cls(labelHM     = analyzer.get_space_group_symbol(),
+                   number      = analyzer.get_space_group_number(),
+                   elementList = analyzer.get_space_group())
 
     def generateUniquePoints(self, testPts, cut = 1.e-5, boundUnitCell = False):
         outList = []
@@ -691,10 +714,13 @@ class Structure:
         return cls(unitCell    = UnitCell(vectors = np.array([parentStructure.unitCell.vectors[i] * (limits[1][i] - limits[0][i])  for i in xrange(3)])),
                    speciesList = newSpeciesList)
 
-    def changeUnitCell(self, inLimits):
+    def changeUnitCell(self, inLimits, retainUnitCell = False):
         ''' Changes this unit cell, such that atoms are now between new limits 
             N.B. only an origin at 0,0,0 is used for definition of unit cell atm 
-            and this subroutine assumes that input self is in usual cell convention - [0,1)^3 (I believe) '''
+            and this subroutine assumes that input self is in usual cell convention - [0,1)^3 (I believe) 
+
+            example use: myStructureInstance.changeUnitCell(np.array([[-1,2], [-1,2], [-1,2]]),
+                                                            retainUnitCell = True) '''
 
         # ensure min first
         limits = np.array([[min(l), max(l)] for l in inLimits])
@@ -724,7 +750,9 @@ class Structure:
 
         self.speciesList = newSpeciesList
         # catch errors hopefully with this
-        self.unitCell    = None
+        if not retainUnitCell:
+            self.unitCell    = None
+
         return self
 
     def uniqueSpecies(self, attrList):
@@ -851,10 +879,10 @@ class Structure:
 # 
 #        raise Exception('Better to just read a cif with PMG or ASE for now')
 
-    @classmethod
+#    @classmethod
     def superCell(self, superCell):
         ''' returns a superCell - input (1,1,1) for eg (tuple of ints (fracs??))'''
-        return Structure.fromASEStructure( self.toASEStructure * superCell )
+        return Structure.fromASEStructure( self.toASEStructure() * superCell )
 
     def toASEStructure(self):
         from ase import Atoms
@@ -938,6 +966,14 @@ class Structure:
         ''' Only write P1 at the moment- quickCif = True '''
         from cifIO import writeCIF
         writeCIF(cifName, self, quickCif = True)
+
+    def removeListIndices(self, deletionsList):
+        ''' Deletes the species with these indices (it will do reversing for you) '''
+
+        for i in deletionsList[::-1]:
+            del(self.speciesList[i])
+
+        return len(self.speciesList)
 
     def removeListSpecies(self, speciesToMatch, attributes = ['element']):
         ''' Removes a list of matching species from self.speciesList
