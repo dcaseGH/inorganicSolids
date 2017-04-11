@@ -21,6 +21,11 @@ def timeStringToFloat(s):
 
     return float(s[:-1]) * seconds[s[-1].lower()]
 
+def dateString():
+    import time
+    digits = time.strftime("%x").split('/')
+    return digits[1] + digits[0] + digits[2]
+
 def groupIntegers(listIn, returnString = True):
     ''' E.g. if you want to return the numbers of the atoms in some list '''
     from itertools import groupby

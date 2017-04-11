@@ -1,0 +1,49 @@
+ SYSTEM = LLWO #A string to label things
+
+# Program settings
+ NWRITE = 2  #How much to write out 0-3 (3 being most verbose)
+ LORBIT = 12 #makes PROOUT file which has projections of \Psi onto spherical harmonics centred on ions (default is to ignore)
+# LWAVE = .FALSE. #Write a WAVCAR (default true)
+# LCHARG = .FALSE. #Write charge density CHGCAR (def. True)
+# LVTOT = .TRUE. #Write local potential LOCPOT (def. False)
+
+# Parallelism
+ LSCALU = .FALSE. #Use scaLAPACK LU decomposition as opposed to default LU decomp (needs compilation with particular flag etc)
+ LPLANE= .FALSE. #Parallelize over plane waves- I think this is for older architectures? False is default
+ NSIM = 1 # RMM-DIIS works block mode if NSIM > 1. Could speed this up?
+# KPAR = 8 #K point parallelization - possibly of order no unique k points ^0.5 (ish)
+ NPAR = 8 #Band parallelization- want around NPAR=no of cores ^0.5 AND to divide things into [no of cores per node] sized chunks
+
+# Initialisation parameters
+ ISTART = 1
+ INIWAV = 1
+ ICHARG = 2
+
+# System parameters
+ GGA = PE #Stick with PE(=PBE for some reason)
+ LREAL = Auto
+ ISYM = 0
+# LASPH = .TRUE.
+# LMAXMIX = 4
+
+# Electronic Relaxation
+ PREC = Medium
+ ALGO = Fast
+ LDIAG = .TRUE.
+ ENCUT = 600.00
+ NELM = 200
+ NELMIN = 4
+ NELMDL = -5
+ ISPIN = 2 
+ EDIFF = 0.0001
+
+# Electron smearing
+ ISMEAR = 0 
+ SIGMA = 0.20 
+
+# Ionic Relaxation
+ IBRION = 2
+ POTIM = 0.5
+ NSW = 100
+ ISIF = 3
+ EDIFFG = -0.01

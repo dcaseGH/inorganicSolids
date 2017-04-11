@@ -38,6 +38,58 @@ class LAMMPSInput():
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
+    def writeDataWithASE(self, outputFile):
+        ''' ASE should have useful stuff- but check formatting is good '''
+        from ase.calculators.lammpsrun import write_lammps_data
+
+        write_lammps_data(outputFile, self.parentStructure.toASEStructure())
+
+    def reformatASEFile(self, oldFileName, newFileName, deleteOldFile=False, chargeDict = {}):
+        ''' reads oldFileName, adds masses and changes the atoms info, and writes to newFileName
+            this is clumsy, but helpful for now '''
+#        from ase.data import atomic_masses, chemical_symbols
+
+        # change if need something with shells
+        assert(not any([x.core[0].lower() == 's' for x in self.parentStructure.speciesList]))
+
+#        with open('tempout', 'w') as outf:
+#            outf.write(
+#        oldFileString   = open(oldFileName, 'r').read()
+        preamble, atoms = open(oldFileName, 'r').read().split('Atoms')
+
+        orderedAtomsASE = sorted([str(x.element) for x in self.parentStructure.uniqueSpecies(['element'])])
+        print 'orderedAtomsASE', orderedAtomsASE
+
+        def changeAtomsLine(line):
+            try:
+                # assume everything is molecule 0 (so no shells)
+                data = line.split()
+                data[1] = "0  %s  %s"%(data[1], chargeDict[int(data[1])])
+                return " ".join(data)
+            except:
+                return line
+
+
+        # LAMMPS sensitive to number of blank lines
+        reformattedAtoms = "\n".join(['Atoms'] + map(changeAtomsLine, atoms.split("\n")))
+
+        with open(newFileName, 'w') as outf:
+            outf.write(preamble + self.massesString() + reformattedAtoms)
+
+        if deleteOldFile:
+            import os
+            os.remove(oldFileName)
+
+    def massesString(self):
+        ''' note this is only used for reformatting ase file '''
+#        assert(self.parentStructure.uniqueSpeciesOrder[0].mass > 0.)
+        assert([x.mass > 0 for x in self.parentStructure.uniqueSpecies(['element'])])
+        outString = "Masses\n\n"
+        for i, at in enumerate(sorted(self.parentStructure.uniqueSpecies(['element']), key=lambda x:x.element)):
+            outString += str(i + 1) + " " + str(at.mass) + "\n"
+        outString += "\n"
+        return outString
+
     def defineUniqueSpeciesOrder(self):
         self.uniqueSpeciesOrder = self.parentStructure.uniqueSpecies(['element', 'core'])
         return self.uniqueSpeciesOrder
@@ -63,14 +115,44 @@ class LAMMPSInput():
         return 0
 
     def unitCellDefinition(self):
-        # is this a 'right angled' cell, with conventional setting (diagonal)?
-        if np.array_equal(np.dot(self.parentStructure.unitCell.vectors, np.identity(3)),
+        # is this a 'right angled' cell, with conventional setting (diagonal)? - assume right angled- note LAMMPS doesn't have c||z
+        def calcLAMMPSParameters(unitCell):
+            ''' return [lx, ly, lz, xy, xz, yz] 
+                http://lammps.sandia.gov/doc/Section_howto.html#howto-12 '''
+
+            lx = unitCell.lengths[0]
+            xy = unitCell.lengths[1] * np.cos(np.pi * unitCell.angles[2] / 180.)
+            xz = unitCell.lengths[2] * np.cos(np.pi * unitCell.angles[1] / 180.)
+            ly = (unitCell.lengths[1] ** 2. - xy**2.)**0.5
+            yz = (np.cos(np.pi * unitCell.angles[0] / 180.) * unitCell.lengths[1] * unitCell.lengths[2] - xy * xz) / ly
+            lz = (unitCell.lengths[2]**2. - xz**2. - yz**2.)**0.5
+
+            return [lx, ly, lz, xy, xz, yz]
+
+        if np.array_equal(np.diag(np.diag(self.parentStructure.unitCell.vectors)),
                           self.parentStructure.unitCell.vectors):
             return "0.0  %s  xlo xhi\n0.0  %s  ylo yhi\n0.0  %s  zlo zhi\n"%(self.parentStructure.unitCell.vectors[0,0], 
                                                                              self.parentStructure.unitCell.vectors[1,1], 
                                                                              self.parentStructure.unitCell.vectors[2,2])
         else:
-            raise Exception('Implement triclinic cells')
+            lammpsCellParameters = calcLAMMPSParameters(self.parentStructure.unitCell)
+            return ("0.0  %s  xlo xhi\n0.0  %s  ylo yhi\n0.0  %s  zlo zhi\n"+\
+                    "%s  %s  %s  xy xz yz\n")%tuple(calcLAMMPSParameters(self.parentStructure.unitCell))
+#            def biggestByAbsValue(v1, v2):
+#                if abs(v1) > abs(v2):
+#                    return v1
+#                else:
+#                    return v2
+
+            # The reason that the max(m, m^{T}) appears is that there are many conventions on this
+#            return ("0.0  %s  xlo xhi\n0.0  %s  ylo yhi\n0.0  %s  zlo zhi\n"+\
+#                    "%s  %s  %s  xy xz yz\n")%(self.parentStructure.unitCell.vectors[0,0], 
+#                                              self.parentStructure.unitCell.vectors[1,1], 
+#                                              self.parentStructure.unitCell.vectors[2,2],
+#                                              biggestByAbsValue(self.parentStructure.unitCell.vectors[0,1], self.parentStructure.unitCell.vectors[1,0]),
+#                                              biggestByAbsValue(self.parentStructure.unitCell.vectors[0,2], self.parentStructure.unitCell.vectors[2,0]),
+#                                              biggestByAbsValue(self.parentStructure.unitCell.vectors[2,1], self.parentStructure.unitCell.vectors[1,2]))            
+#            raise Exception('Implement triclinic cells')
 
     def labelElementWRTMolecules(self):
         ''' 0 if not a 'molecule' and 1,2,3 etc otherwise '''
@@ -266,7 +348,7 @@ class LAMMPSOutput():
     @staticmethod
     def structureGeneratorFromXYZandLog(xyzFileName, logFile, speciesDict = None, selectList = None):
         ''' Yield structures as required  from xyz (trajectory) and maybe logfile too
-            ONLY WORKS FOR ORTHORHOMBIC CELLS '''
+            ONLY WORKS FOR ORTHORHOMBIC CELLS IF LX,LY,LZ not present '''
         from coreClasses import XYZFile, Structure, UnitCell
         logDict = LAMMPSOutput.logDataToDict(logFile)
         trajXYZ = XYZFile(fileName = xyzFileName)
@@ -279,10 +361,18 @@ class LAMMPSOutput():
                                                   returnIndex = True):
 
             speciesList = XYZFile.xyzStringToSpeciesList(xyz, speciesDict = speciesDict)
-            unitCell    = UnitCell(vectors = np.diag(map(float, [logDict['Lx'][ixyz],
-                                                                 logDict['Ly'][ixyz],
-                                                                 logDict['Lz'][ixyz]])))
 
+            #make unit cell- note that log file has particular strings that LAMMPS uses- e.g. Lx, Xy etc
+            # if Xy specified, make upper triangular, if not specified- make orthorhombic
+            if 'Xy' in logDict.keys():
+                unitCell    = UnitCell(vectors = np.array([[logDict['Lx'][ixyz], logDict['Xy'][ixyz], logDict['Xz'][ixyz]], 
+                                                           [0.,                  logDict['Ly'][ixyz], logDict['Yz'][ixyz]], 
+                                                           [0.,                  0.,                  logDict['Lz'][ixyz]]], dtype='float64'))
+            else:
+                unitCell    = UnitCell(vectors = np.diag(map(float, [logDict['Lx'][ixyz],
+                                                                     logDict['Ly'][ixyz],
+                                                                     logDict['Lz'][ixyz]])))
+                
             yield Structure(speciesList = speciesList,
                             unitCell    = unitCell)
 

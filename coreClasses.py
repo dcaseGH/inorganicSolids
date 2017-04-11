@@ -243,7 +243,7 @@ class Species:
 
     def toASEAtom(self):
         from ase import Atom
-        return Atom(self.element, self.cartCoord)
+        return Atom(str(self.element), self.cartCoord)
 
     @classmethod
     def initFromASEAtom(cls, aseAtom):
@@ -578,6 +578,63 @@ class VBuckingham:
         plt.show()
 #        return listBucks
 
+    def fitToLJ(self,
+                fitBounds    = np.array([1., 2.5]),
+                fitPoints    = 100,
+                initialGuess = np.array([10., 0.])):
+        ''' return an LJ potential with fitted parameters '''
+        from scipy.optimize import fmin
+
+#        outLJPot = 
+        from scipy.optimize import fmin
+
+        testPoints = np.array([np.min(fitBounds) + (np.max(fitBounds) - np.min(fitBounds)) * x / float(fitPoints) for x in xrange(fitPoints)])
+
+        def squareDifference(constants):
+            ''' constants are np.array([c12, c6]) '''
+            if constants[0] < 0. or constants[1] > 0.:
+                penalty=1000.
+            else:
+                penalty = 0.
+            return sum([(self.energy(r) - VLennardJones.r6r12Energy(r, constants[0], constants[1]))**2 for r in testPoints]) + penalty
+#            return sum([(self.energy(r) - VLennardJones.r6r12Energy(r, constants[0], constants[1]) / self.energy(r))**2 for r in testPoints])
+
+        print testPoints
+        outputMinimization = fmin(squareDifference, initialGuess)
+        print self.energy(2.), VLennardJones.r6r12Energy(2., outputMinimization[0], outputMinimization[1])
+        print outputMinimization, "c12 c6"
+#        print self.energy(1.), VLennardJones.r6r12(1., 
+#        outLJPot.c6 = 
+        return VLennardJones(species1 = self.species1,
+                             species2 = self.species2,
+                             c6       = outputMinimization[1],
+                             c12      = outputMinimization[0])
+
+class VLennardJones:
+    # be clear about conventions- note LAMMPS may be different (and note signs etc)
+    def __init__(self,
+                 species1 = None,
+                 species2 = None,
+                 c6       = None,
+                 c12      = None):
+
+        self.species1 = species1
+        self.species2 = species2
+        self.c6       = c6
+        self.c12      = c12
+
+    def energy(self, r):
+        return self.c12 * r**(-12) - self.c6 * r**(-6)
+
+    @staticmethod
+    def r6r12Energy(r, c12, c6):
+        return c12 * r**(-12) - c6 * r**(-6)
+
+    def returnEpsilonSigma(self):
+        print self.c6, self.c12
+        epsilon = self.c6 **2 / (4. * self.c12)
+        sigma   = (self.c12 / self.c6)**(1./6.)
+        return np.array([epsilon, sigma])
 
 class VThreeBody:
     ''' Follow 1.4.3 GULP manual (rho is inverse length)
@@ -755,6 +812,17 @@ class Structure:
 
         return self
 
+    def lllReduce(self):
+        ''' this code is taken from PyMatGen and uses its functionality
+            see pmg.core.surface for an example (hence name slab) 
+            run this as structure = structure.lllReduce() '''
+
+        slab = self.toPMGStructure()
+        lll_slab = slab.copy(sanitize=True)
+        mapping = lll_slab.lattice.find_mapping(slab.lattice)
+
+        return self.fromPMGStructure(lll_slab)
+
     def uniqueSpecies(self, attrList):
         ''' Return list, worry about changes if need be'''
         from setTools import subsetByAttributes
@@ -912,6 +980,23 @@ class Structure:
         return cls(unitCell    = gulpOutputDict['unitCell'],
                    speciesList = gulpOutputDict['speciesList'])
     
+    def toPMGStructure(self):
+        ''' pymatgen structure- assume P1 cell '''
+        from pymatgen.core import Structure as PMGS
+        from pymatgen.core import Lattice   as PMGL
+
+        # only concerned with core atoms (no shells)
+        coreSpeciesIndices = [i for i in range(len(self.speciesList)) if self.speciesList[i].core == 'core']
+        outLattice   = PMGL.from_parameters(self.unitCell.lengths[0],
+                                            self.unitCell.lengths[1],
+                                            self.unitCell.lengths[2],
+                                            self.unitCell.angles[0],
+                                            self.unitCell.angles[1],
+                                            self.unitCell.angles[2])
+        return PMGS.from_spacegroup(1,
+                                    outLattice,
+                                    [self.speciesList[i].element   for i in coreSpeciesIndices],
+                                    [self.speciesList[i].fracCoord for i in coreSpeciesIndices])       
 
     @classmethod
     def fromPMGStructure(cls, pmgStructure):
@@ -1130,16 +1215,25 @@ class Structure:
         # start by temporarily making a PMG structure- use this functionality and watch fracCoord bounds
         centralFracCoord = np.mod(self.speciesList[speciesListIndex].fracCoord, 1)
         tempPMGStructure = self.makePMGStructure() 
-        centralSite = [s for s in tempPMGStructure._sites if np.allclose(s._fcoords, centralFracCoord, atol=1.e-6)][0]
+        try:
+            centralSite = [s for s in tempPMGStructure._sites if np.allclose(s._fcoords, centralFracCoord, atol=1.e-6)][0]
+        except:
+            print "Issues for coordinate at ", centralFracCoord #for some reason np.mod doesn't work at fracCoord = 1.
+            tempOut = []
+            for i in xrange(3):
+                if abs(centralFracCoord[i] - 1.) < 0.0000001:
+                    tempOut.append(0.)
+                else:
+                    tempOut.append(centralFracCoord[i])
+            centralFracCoord = np.array(tempOut)
+            centralSite = [s for s in tempPMGStructure._sites if np.allclose(s._fcoords, centralFracCoord, atol=1.e-6)][0]
 
         tempPMGNeighbours = sorted(tempPMGStructure.get_neighbors(centralSite, cutoffRadius), key = lambda x:x[1])
-#        print [x[0]._species for x in tempPMGNeighbours[:5]];print centralSite.__dict__;exit()
         if targetSpecies:
             listNeighbours = [x for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element]
         else:
             listNeighbours = tempPMGNeighbours
 
-#            return [x[1] for x in tempPMGNeighbours if x[0]._species._data.keys()[0].symbol == targetSpecies.element]
         if returnVectors:
             return [x[0]._coords - centralSite._coords for x in listNeighbours]
         elif returnSpeciesList:
