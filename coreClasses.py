@@ -335,6 +335,25 @@ class UnitCell:
                                                                     np.dot(self.vectors[0], self.vectors[2]) / (self.lengths[0] * self.lengths[2]),
                                                                     np.dot(self.vectors[0], self.vectors[1]) / (self.lengths[0] * self.lengths[1])]))
 
+    @staticmethod
+    def generalLengthsAnglesMatrix(matrix, anglesDegrees = True):
+        ''' If have matrix in unusual form, can get angles and lengths
+            Useful e.g. with LAMMPS cells 
+            matrix is numpy array with indices (fractional, cartesian) 
+            '''
+
+        if anglesDegrees:
+            convFactor = 180./np.pi
+        else:
+            convFactor = 1.
+
+        lengths = np.array([np.linalg.norm(matrix[x, :]) for x in xrange(3)])
+        angles  = convFactor * np.array(map(np.arccos, [np.dot(matrix[1], matrix[2]) / (lengths[1] * lengths[2]),
+                                                        np.dot(matrix[0], matrix[2]) / (lengths[0] * lengths[2]),
+                                                        np.dot(matrix[0], matrix[1]) / (lengths[0] * lengths[1])]))
+
+        return lengths, angles
+
     def calculateVectors(self, lengths, angles):
         """
         stolen from pymatgen- will possibly use their code in future
@@ -1052,6 +1071,12 @@ class Structure:
         from cifIO import writeCIF
         writeCIF(cifName, self, quickCif = True)
 
+    def toXYZ(self, xyzName, includeShells=False, includeCellVectors=True, reorderAlphabetically=True):
+        with open(xyzName, 'w') as outf:
+            outf.write(self.xyzString(includeShells=includeShells,
+                                      includeCellVectors=includeCellVectors,
+                                      reorderAlphabetically=reorderAlphabetically))
+
     def removeListIndices(self, deletionsList):
         ''' Deletes the species with these indices (it will do reversing for you) '''
 
@@ -1079,17 +1104,17 @@ class Structure:
 
         return separatedList
 
-    def removeSpeciesSobol(self, species, nRemove, offset = 0):
+    def removeSpeciesSobol(self, species, nRemove, offset = 0, swapSpecies = None, cartesian = True):
         ''' Remove nRemove species, that match character of species, according to closest fractional 
             coordinates to those from sobol list 
             Will only work well if atoms are sensibly bounded within lattice vectors (as looks in [0,1)^3 . LatticeVectors)
-            Deletions are in order '''
+            Deletions are in order 
+            if give a swapSpecies , deleted species -> this new one '''
 
         from setTools import sameElementByAttributes
         from sobol_lib import i4_sobol
    
         #Assume cartesian coordinates are wanted at this stage- easy to change if needed
-        cartesian = True
         attributesList = [k for k in species.__dict__.keys() if species.__dict__[k] is not None]
 
 #        matchingElements = [x for x in self.speciesList if sameElementByAttributes(x, species, attributesList)]
@@ -1109,8 +1134,12 @@ class Structure:
                         distance, savedPosition = newDistance, im
             deletedElements.append(savedPosition)
 
+        # either replace or delete the selected species (only change the element - add charge/mass another time??)
         for i in deletedElements:
-            del(self.speciesList[i])
+            if swapSpecies is not None:
+                self.speciesList[i].element = swapSpecies.element
+            else:
+                del(self.speciesList[i])
 
         return len(self.speciesList)
 
@@ -1180,6 +1209,41 @@ class Structure:
         from setTools import sameElementByAttributes
 
         return [x[0] for x in enumerate(self.speciesList) if sameElementByAttributes(x[1], targetSpecies, matchAttributes)]
+
+    def checkOverlappingAtoms(self,
+                              cutoff,
+                              adjustAtoms = False):
+        ''' confirm that cartCoords do not overlap (quicker check than radialDistributionFunction
+            no PBC '''
+        cartCoords = self.cartCoords()
+        cutSquare  = cutoff**2
+        foundAny   = False
+        swapIndices = []
+        eta        = 1.e-6 # numerical consideration to ensure push atoms apart enough
+        for i1 in xrange(cartCoords.shape[0]):
+            for i2 in xrange(cartCoords.shape[0]):
+                if i1 == i2:
+                    continue
+                distVec = cartCoords[i1]- cartCoords[i2]
+                if np.dot(distVec, distVec) < cutSquare:
+                    if adjustAtoms:
+                        foundAny = True
+                        #move second atom (so can test later) (remember to move cartCoords[i2])
+                        self.speciesList[i2].cartCoord = self.speciesList[i2].cartCoord - distVec * (cutoff - np.linalg.norm(distVec) + eta) / np.linalg.norm(distVec)
+                        cartCoords[i2] = cartCoords[i2] - distVec * (cutoff - np.linalg.norm(distVec) + eta) / np.linalg.norm(distVec)
+                    else:
+                        return True
+        return foundAny
+
+    def removeOverlappingAtoms(self,
+                               cutoff,
+                               maxIt = 10):
+        ''' Loop through checkOverlappingAtoms, pushing atoms to cutoff length apart 
+            Return true if structure can be made to have no overlapping atoms '''
+        for i in xrange(maxIt):
+            if not self.checkOverlappingAtoms(cutoff, adjustAtoms = True):
+                return True
+        return False
 
     def nearestNeighbourDistance(self,
                                  speciesListIndex = None, 
