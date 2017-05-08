@@ -232,6 +232,19 @@ class TestStructureMethods(unittest.TestCase):
         np.testing.assert_array_almost_equal(structure.unitCell.lengths,
                                              np.array([40.431938,    39.603764,    43.959198]))
 
+    def test_quasiPeriodicEmbedding(self):
+        from coreClasses import Structure
+        smallStructure = Structure.fromXYZ('testFiles/example.xyz')
+        slightlyBiggerStructure = Structure.fromXYZ('testFiles/example.xyz')
+        slightlyBiggerStructure.changeUnitCell(np.array([[-0.25, 1.25],
+                                                         [-0.25, 1.25],
+                                                         [-0.25, 1.25]]),
+                                               retainUnitCell = True)
+
+        smallStructure.setFracCoord()
+
+        self.assertTrue(smallStructure.withinPeriodicEnvelopment(slightlyBiggerStructure, 1.e-1))
+
 class TestSpeciesMethods(unittest.TestCase):
 
     def test_setThermalVelocity(self):

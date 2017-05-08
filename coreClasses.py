@@ -438,6 +438,45 @@ class UnitCell:
         else:
             return fracVertices
 
+    @classmethod
+    def randomCell(cls,
+                   angles              = np.array([90., 90., 90]), 
+                   lengths             = None,
+                   angleRandomNumbers  = None,
+                   lengthRandomNumbers = None,
+                   targetVolume        = None):
+        ''' Generate a random cell 
+            see organic structure generation (ask Dave) for details '''
+
+        if angleRandomNumbers is not None:
+            asin_val = np.arcsin(2.0 * angleRandomNumbers - 1.0 ) / np.pi
+            minAngle, delta = 60., 120. - 60.
+            _angles = (0.5 + asin_val)*delta + minAngle
+        else:
+            _angles = angles
+
+        if lengths is not None:
+            _lengths = lengths
+        else:
+            d2r = np.pi/180.
+            from scipy.stats import norm
+            vStar = (1.0+ 2.0 * np.cos(_angles[0]*d2r) * np.cos(_angles[1]*d2r) * np.cos(_angles[2]*d2r) - np.cos(_angles[0]*d2r)**2 - np.cos(_angles[1]*d2r)**2 - np.cos(_angles[2]*d2r)**2 )**0.5
+            _sigma = 2.           
+            _lengths = np.array([norm.ppf(x) * _sigma + (targetVolume/vStar)**(1./3.) for x in np.clip(lengthRandomNumbers, 0.01, 0.99)])
+#            if rand_vec.unit_cell_lengths[0] > 0.99:
+#                temp_lengths [ 0 ] = norm.ppf(0.99) * sd_param * self.length_bounds[0][0] + mean0
+#            elif rand_vec.unit_cell_lengths[0]<0.01:
+#                temp_lengths [ 0 ] = norm.ppf(0.01) * sd_param * self.length_bounds[0][0] + mean0
+#            else:
+#                temp_lengths [ 0 ] = norm.ppf(rand_vec.unit_cell_lengths[0]) * sd_param * self.length_bounds[0][0] + mean0            _sigma   = 0.1
+#            _lengths = 
+#            _lengths = np.random.normal(targetVolume ** (1./3.),
+#                                        _sigma,
+#                                        3)
+
+        return cls(angles  = np.array(_angles),
+                   lengths = np.array(_lengths))
+
 class Potential:
     ''' At the moment, just a holder '''
     # no need to __init__ ???
@@ -790,6 +829,159 @@ class Structure:
         return cls(unitCell    = UnitCell(vectors = np.array([parentStructure.unitCell.vectors[i] * (limits[1][i] - limits[0][i])  for i in xrange(3)])),
                    speciesList = newSpeciesList)
 
+    @classmethod
+    def cutOutParallelepiped(cls, parentStructure, parallelepiped, origin = np.zeros(3), periodicTestCutoff = None):
+        ''' Rather than just take sub section (above), can allow a general parallelepiped to be cut out
+            Should be same as above for orthorhombic cell and no rotation (not checked yet) 
+            parallelepiped is np.array().shape = (3,3)
+            periodicTestCutoff is in \\A - it will look to see whether another atom is found just outside box on other side '''
+
+        from copy import deepcopy
+
+        invVectors     = np.linalg.inv(parallelepiped)
+        newSpeciesList = []
+
+        parentStructure.setFracCoord()
+        for i in xrange(len(parentStructure.speciesList)):
+#            fracCoord = np.dot(parentStructure.speciesList[i].cartCoord, invVectors)
+            fracCoord = np.dot(parentStructure.speciesList[i].cartCoord - origin, invVectors)
+            if all([x >= 0. and x < 1. for x in fracCoord]):
+                parentStructure.speciesList[i].fracCoord = fracCoord
+                parentStructure.speciesList[i].cartCoord = np.dot(fracCoord, parallelepiped)
+                newSpeciesList.append(deepcopy(parentStructure.speciesList[i]))
+
+        #note that at this stage returning an unrotated cell 050517
+        return cls(unitCell    = UnitCell(vectors = parallelepiped),
+                   speciesList = newSpeciesList)
+
+    def withinPeriodicEnvelopment(self, bigCell, dist, distVec = None):
+        ''' quasi periodicity is tested- are there similar atoms to ones near edges one cell translation away?
+            make big cell to include things that were not in self 
+            distVec is vector of length dist along (1,1,1) - (0,0,0) '''
+
+        # if not given a vector to pick fractional cutoffs, use this
+        if not distVec:
+            distVec = np.ones(3) * 3**-0.5 * dist
+        fractionalCutoffs = np.vstack([np.dot(distVec, np.linalg.inv(self.unitCell.vectors)),
+                                       1. - np.dot(distVec, np.linalg.inv(self.unitCell.vectors))])
+
+        # total if statements = 6 faces, 12 edges, 8 vertices = 26 (labelled f,c,v below)
+        for at in self.speciesList:
+            #fx0
+            if at.fracCoord[0] < fractionalCutoffs[0, 0]:
+                if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                    return False
+                #exy0
+                if at.fracCoord[1] < fractionalCutoffs[0, 1]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] + self.unitCell.vectors[1]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                    #vxyz0
+                    if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] + self.unitCell.vectors[1] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+                    #vxyz1
+                    if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] + self.unitCell.vectors[1] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+
+                #exy1
+                if at.fracCoord[1] > fractionalCutoffs[1, 1]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] - self.unitCell.vectors[1]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                    #vxzy2
+                    if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] - self.unitCell.vectors[1] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+                    #vxyz3
+                    if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] - self.unitCell.vectors[1] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+
+                #exz0
+                if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                #exz1
+                if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[0] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+
+            #fx1
+            if at.fracCoord[0] > fractionalCutoffs[1, 0]:
+                if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                    return False
+                #exy2
+                if at.fracCoord[1] < fractionalCutoffs[0, 1]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] + self.unitCell.vectors[1]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                    #vxyz4
+                    if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] + self.unitCell.vectors[1] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+                    #vxyz5
+                    if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] + self.unitCell.vectors[1] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+
+                #exy3
+                if at.fracCoord[1] > fractionalCutoffs[1, 1]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] - self.unitCell.vectors[1]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                    #vxzy6
+                    if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] - self.unitCell.vectors[1] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+                    #vxyz7
+                    if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                        if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] - self.unitCell.vectors[1] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                            return False
+
+                #exz2
+                if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                #exz3
+                if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[0] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+
+            #fy0
+            if at.fracCoord[1] < fractionalCutoffs[0, 1]:
+                if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[1]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                    return False
+                #eyz0
+                if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[1] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                #eyz1
+                if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[1] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+            #fy1
+            if at.fracCoord[1] > fractionalCutoffs[1, 1]:
+                if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[1]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                    return False
+                #eyz2
+                if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[1] + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+                #eyz3
+                if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                    if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[1] - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                        return False
+
+            #fz0
+            if at.fracCoord[2] < fractionalCutoffs[0, 2]:
+                if not any([np.linalg.norm(at.cartCoord - x.cartCoord + self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                    return False
+            #fz1
+            if at.fracCoord[2] > fractionalCutoffs[1, 2]:
+                if not any([np.linalg.norm(at.cartCoord - x.cartCoord - self.unitCell.vectors[2]) < dist for x in bigCell.speciesList if x.element == at.element]):
+                    return False
+
+        return True
+
+
     def changeUnitCell(self, inLimits, retainUnitCell = False):
         ''' Changes this unit cell, such that atoms are now between new limits 
             N.B. only an origin at 0,0,0 is used for definition of unit cell atm 
@@ -825,6 +1017,7 @@ class Structure:
                                                   fracCoord = newPt))
 
         self.speciesList = newSpeciesList
+        self.setCartCoord()
         # catch errors hopefully with this
         if not retainUnitCell:
             self.unitCell    = None
@@ -918,6 +1111,20 @@ class Structure:
                 tempList.append(dc(newSpecies))
         self.speciesList += tempList
         return len(self.speciesList)
+
+    def removeShells(self):
+        self.speciesList = [x for x in self.speciesList if x.core.lower()[0] != 's']
+        return len(self.speciesList)
+
+    #@property??
+    def density(self, numberDensity = False):
+        from ase.data import atomic_masses, chemical_symbols
+        totalMass = sum([atomic_masses[chemical_symbols.index(t.element)] for t in self.speciesList])
+        volume    = np.linalg.det(self.unitCell.vectors)
+        if numberDensity:
+            return float(len(self.speciesList)) / volume
+        return totalMass / volume
+        
 
     def setCharges(self, templateSpecies, onlySetSome = False):
         ''' Pass in some templateSpecies- anything in speciesList that matches these gets the template's charge 
