@@ -245,6 +245,21 @@ class TestStructureMethods(unittest.TestCase):
 
         self.assertTrue(smallStructure.withinPeriodicEnvelopment(slightlyBiggerStructure, 1.e-1))
 
+    def test_cutOutSection(self):
+        from coreClasses import Structure, UnitCell, Species
+
+        dummyStructure = Structure(unitCell    = UnitCell(vectors = np.diag([10., 10., 10.])),
+                                   speciesList = [Species(element   = 'X',
+                                                          fracCoord = np.array([i,j,k])) for i in 0.1 * np.arange(10) for j in 0.1 * np.arange(10) for k in 0.1 * np.arange(10)])
+
+        dummyStructure.setCartCoord()
+        newStructure = Structure.cutOutParallelepiped(dummyStructure,
+                                                      np.diag([5., 5., 5.]),
+                                                      origin = np.array([0.25, 0.25, 0.25]))
+
+        self.assertTrue(float(len(dummyStructure.speciesList)) / float(len(newStructure.speciesList)) == 2.**3)
+
+
 class TestSpeciesMethods(unittest.TestCase):
 
     def test_setThermalVelocity(self):
