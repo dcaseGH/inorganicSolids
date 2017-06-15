@@ -53,6 +53,7 @@ class XYZFile:
         if len(splitLine) != 4:
             return False
         # Deal with cases where atom has a numerical index at another time
+#        print 'MASSIVE HACK IN CORECLASSES.XYZ';return True
         if splitLine[0][0].isalpha() and all([x.replace('.', '', 1).replace('e', '', 1).replace('-', '', 1).replace('E', '', 1).isdigit() for x in splitLine[1:]]):
             return True
         return False
@@ -425,8 +426,11 @@ class UnitCell:
         return outpoints
 
     @classmethod
-    def fromXYZFile(cls, xyzFile):
-        return cls(vectors = XYZFile.xyzStringToCellVectors(open(xyzFile.fileName, 'r').read()))
+    def fromXYZFile(cls, xyzFile, transposeVectors = False):
+        if transposeVectors:
+            return cls(vectors = XYZFile.xyzStringToCellVectors(open(xyzFile.fileName, 'r').read()).T)
+        else:
+            return cls(vectors = XYZFile.xyzStringToCellVectors(open(xyzFile.fileName, 'r').read()))
 
     def vertices(self, fractional = True):
         ''' vertices of the unit cell - property?? '''
@@ -846,9 +850,14 @@ class Structure:
 #            fracCoord = np.dot(parentStructure.speciesList[i].cartCoord, invVectors)
             fracCoord = np.dot(parentStructure.speciesList[i].cartCoord - origin, invVectors)
             if all([x >= 0. and x < 1. for x in fracCoord]):
-                parentStructure.speciesList[i].fracCoord = fracCoord
-                parentStructure.speciesList[i].cartCoord = np.dot(fracCoord, parallelepiped)
-                newSpeciesList.append(deepcopy(parentStructure.speciesList[i]))
+                newSpeciesList.append(Species(element   = parentStructure.speciesList[i].element,
+                                              core      = parentStructure.speciesList[i].core,
+                                              charge    = parentStructure.speciesList[i].charge,
+                                              fracCoord = fracCoord,
+                                              cartCoord = np.dot(fracCoord, parallelepiped)))
+#                parentStructure.speciesList[i].fracCoord = fracCoord
+#                parentStructure.speciesList[i].cartCoord = np.dot(fracCoord, parallelepiped)
+#                newSpeciesList.append(deepcopy(parentStructure.speciesList[i]))
 
         #note that at this stage returning an unrotated cell 050517
         return cls(unitCell    = UnitCell(vectors = parallelepiped),
@@ -860,7 +869,7 @@ class Structure:
             distVec is vector of length dist along (1,1,1) - (0,0,0) '''
 
         # if not given a vector to pick fractional cutoffs, use this
-        if not distVec:
+        if distVec is None:
             distVec = np.ones(3) * 3**-0.5 * dist
         fractionalCutoffs = np.vstack([np.dot(distVec, np.linalg.inv(self.unitCell.vectors)),
                                        1. - np.dot(distVec, np.linalg.inv(self.unitCell.vectors))])
@@ -990,6 +999,10 @@ class Structure:
             example use: myStructureInstance.changeUnitCell(np.array([[-1,2], [-1,2], [-1,2]]),
                                                             retainUnitCell = True) '''
 
+        #transpose if given rows <-> columns
+        if inLimits.shape == (2,3):
+            inLimits = inLimits.T
+
         # ensure min first
         limits = np.array([[min(l), max(l)] for l in inLimits])
 
@@ -998,10 +1011,6 @@ class Structure:
                                                    for b in xrange(int(np.floor(limits[1, 0])), int(np.ceil(limits[1, 1])))
                                                    for c in xrange(int(np.floor(limits[2, 0])), int(np.ceil(limits[2, 1])))])
 
-
-
-
-#        print possibleTranslations
         if self.speciesList[0].fracCoord is None:
             self.setFracCoord()
 
@@ -1124,7 +1133,26 @@ class Structure:
         if numberDensity:
             return float(len(self.speciesList)) / volume
         return totalMass / volume
-        
+
+    def addStandardCharges(self):
+        ''' Assume all shells already have charge set '''
+        uniqueSpecies  = self.uniqueSpecies(['element', 'core'])
+        uniqueElements = self.uniqueSpecies(['element'])
+        shellCharges = dict([(x.element, x.charge) for x in uniqueSpecies if x.core.lower()[0] == 's'])
+
+        for at in uniqueElements:
+            if any([(x.element == at.element and x.core.lower()[0] == 's') for x in uniqueSpecies]):
+                self.setCharges([Species(element = at.element,
+                                        core    = at.core,
+                                        charge  = at.defaultCharge() - shellCharges[at.element])],
+                                onlySetSome = True)
+            else:
+                self.setCharges([Species(element = at.element,
+                                        core    = at.core,
+                                        charge  = at.defaultCharge())],
+                                onlySetSome = True)
+
+        return self.setCharges([])
 
     def setCharges(self, templateSpecies, onlySetSome = False):
         ''' Pass in some templateSpecies- anything in speciesList that matches these gets the template's charge 
@@ -1230,11 +1258,12 @@ class Structure:
                    speciesList = [Species().initFromPMGSite(x) for x in pmgStructure._sites])
 
     @classmethod
-    def fromXYZ(cls, xyzFileName, unitCell=None):
+    def fromXYZ(cls, xyzFileName, unitCell=None, transposeVectors=False):
+        ''' Transpose vectors may be important if xyz from LAMMPS with lower triangular lattice '''
         xyzF = XYZFile(fileName = xyzFileName)
 
         if not unitCell:
-            unitCell = UnitCell.fromXYZFile(xyzF)
+            unitCell = UnitCell.fromXYZFile(xyzF, transposeVectors=transposeVectors)
 
         speciesList = XYZFile.xyzStringToSpeciesList(open(xyzF.fileName, 'r').read())
 
@@ -1452,6 +1481,15 @@ class Structure:
                 return True
         return False
 
+    def indexNearestSpeciesToPoint(self, pt):
+        ''' Return index of closest species to a pt (cartesian) (use faster routines if ever needed) '''
+        bestDist = np.inf
+        for i in xrange(len(self.speciesList)):
+            newDist = np.linalg.norm(pt - self.speciesList[i].cartCoord)
+            if newDist < bestDist:
+                bestDist, closestI = newDist, i
+        return closestI, bestDist
+
     def nearestNeighbourDistance(self,
                                  speciesListIndex = None, 
                                  targetSpecies    = None,
@@ -1579,3 +1617,72 @@ class Structure:
 
         # the \n is essential for PLUMED
         return outString + "\n"
+
+    def optimiseGULP(self, 
+                     potentials = None, 
+                     addShells = False, 
+                     addStandardCharges = True, 
+                     changeNonStandardCharges = False,
+#                     returnGULPDict = True,  #always return a dict
+                     timeout = 10000., 
+                     keepShell = False):
+        ''' If addShell set it to a list ie [Species(element = 'O',
+                                                     charge  = -2.86)]
+            timeout in seconds (can set to None) 
+            returns (Structure, dictionary) '''
+        import copy
+        from hardcode           import GULP_EXE
+        from subprocessHandling import RunCommandNew
+        from gulpIO             import InputFileGULP, OutputFileGULP
+        
+
+        returnGulpDict = {'initialEnergy'   : None,
+                          'finalEnergy'     : None,
+                          'initialStructure': copy.deepcopy(self),
+                          'finalStructure'  : None,
+                          'phonons'         : None,
+                          'phononsPositive' : None,
+                          'completeSuccess' : False}
+
+        if addShells is not False:
+            if type(addShells) is not type([None]):
+                addShells = list(addShells)
+            for s in addShells:
+                self.addShells(Species(element= s.element,
+                                       charge = s.charge))
+
+        if addStandardCharges:
+            self.addStandardCharges()
+        if changeNonStandardCharges:
+            self.setCharges(changeNonStandardCharges)
+
+        assert(abs(self.setCharges([])) < 1.e-5)
+
+        inFile = InputFileGULP(fileName = '',
+                               title    = 'generic title',
+                               parentStructure = self,
+                               keywords   = ['conp', 'opti', 'phonon'],
+                               potentials = potentials)
+
+        runner = RunCommandNew(GULP_EXE, inFile.stringForm())
+        try:
+            runner.run(timeout=timeout)
+        except:
+            return (None, returnGulpDict)
+
+        try:
+            returnGulpDict['phonons']         = OutputFileGULP().phononFrequencies(runner.output)
+            returnGulpDict['phononsPositive'] = OutputFileGULP().phononFrequenciesPositive(runner.output)
+            returnGulpDict['latticeEnergies'] = [x for x in OutputFileGULP.findAllLatticeEnergies(runner.output)]
+            returnGulpDict['initialEnergy']   = returnGulpDict['latticeEnergies'][0]
+            returnGulpDict['finalEnergy']     = returnGulpDict['latticeEnergies'][-1]
+        except:
+            return (None, returnGulpDict)
+
+        self = Structure.fromGULPOutput(runner.output)
+
+        if not keepShell:
+            self.removeShells()
+
+        returnGulpDict['completeSuccess'] = True
+        return (self, returnGulpDict)

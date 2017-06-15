@@ -66,11 +66,12 @@ atomicValenceElectrons = {
 
 # N.B. only use default charges for very quick tests etc- specify for MD and GULP
 defaultCharges = {
-'O': -2.,
+'Al': 3.,
+'B' : 3.,
+'O' : -2.,
 'Li': 1.,
-'B':  3.,
 'Ti': 4.,
-'V':  5.,
-'P':  5.,
+'V' : 5.,
+'P' : 5.,
 
 }
